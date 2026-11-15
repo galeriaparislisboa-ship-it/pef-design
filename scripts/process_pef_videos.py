@@ -5,7 +5,11 @@ HEAD={"apikey":KEY,"Authorization":"Bearer "+KEY}
 def request(url,method="GET",body=None,extra=None):
  h={**HEAD,**(extra or {})}
  r=urllib.request.Request(url,data=body,headers=h,method=method)
- with urllib.request.urlopen(r,timeout=90) as x:return x.read()
+ try:
+  with urllib.request.urlopen(r,timeout=90) as x:return x.read()
+ except urllib.error.HTTPError as e:
+  detail=e.read(1500).decode('utf-8','replace')
+  raise RuntimeError(f'Supabase HTTP {e.code} for {method} {url.split("/rest/v1/")[-1].split("?")[0]}: {detail}') from None
 def api(path,method="GET",obj=None):
  return json.loads(request(BASE+"/rest/v1/"+path,method,None if obj is None else json.dumps(obj).encode(),{"Content-Type":"application/json","Prefer":"return=representation"}))
 jobs=api("pef_video_jobs?status=eq.pending&order=created_at.asc&limit=10")
