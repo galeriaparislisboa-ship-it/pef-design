@@ -38,7 +38,7 @@ for job in jobs:
    subprocess.run(cmd,check=True,timeout=240)
    probe=subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_name","-of","json",str(out)],capture_output=True,text=True,check=True)
    assert "h264" in probe.stdout and out.stat().st_size>1000
-   request(BASE+"/storage/v1/object/pef-videos/"+urllib.parse.quote(job["output_path"],safe="/"),"POST",out.read_bytes(),{"Content-Type":"video/mp4","x-upsert":"false"})
+   request(BASE+"/storage/v1/object/pef-videos/"+urllib.parse.quote(job["output_path"],safe="/"),"POST",out.read_bytes(),{"Content-Type":"video/mp4","x-upsert":"true"})
    listing=job["listing"];listing["seller_id"]=job["seller_id"];listing["video_url"]=BASE+"/storage/v1/object/public/pef-videos/"+urllib.parse.quote(job["output_path"],safe="/");listing["trim_start"]=0;listing["trim_end"]=10
    api("pef_objects","POST",listing)
    api("pef_video_jobs?id=eq."+jid,"PATCH",{"status":"ready"})
