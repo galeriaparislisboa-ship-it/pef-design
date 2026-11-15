@@ -14,8 +14,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Check FFmpeg
-        run: ffmpeg -version
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
       - name: Convert queued videos
         env:
           SUPABASE_URL: ${{ secrets.PEF_SUPABASE_URL }}
