@@ -2,7 +2,8 @@ name: PEF video transcoding
 on:
   workflow_dispatch:
   schedule:
-    - cron: '* * * * *'
+    # GitHub Actions scheduled workflows support a minimum interval of 5 minutes.
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
 permissions:
   contents: read
 concurrency:
