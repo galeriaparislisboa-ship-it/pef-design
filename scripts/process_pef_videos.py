@@ -34,7 +34,7 @@ for job in jobs:
    else:
     cmd+=["-map","0:v:0","-map","0:a:0?"]
     if ov!=1:cmd+=["-af",f"volume={ov}"]
-   cmd+=["-t","10","-c:v","libx264","-preset","veryfast","-crf","25","-pix_fmt","yuv420p","-vf","scale='min(720,iw)':-2","-r","30","-c:a","aac","-b:a","128k","-movflags","+faststart",str(out)]
+   cmd+=["-t","10","-c:v","libx264","-preset","veryfast","-crf","20","-pix_fmt","yuv420p","-vf","scale='min(1080,iw)':-2","-r","30","-c:a","aac","-b:a","128k","-movflags","+faststart",str(out)]
    subprocess.run(cmd,check=True,timeout=240)
    probe=subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_name","-of","json",str(out)],capture_output=True,text=True,check=True)
    assert "h264" in probe.stdout and out.stat().st_size>1000
