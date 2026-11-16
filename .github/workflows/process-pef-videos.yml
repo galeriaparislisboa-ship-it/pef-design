@@ -16,8 +16,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install FFmpeg
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
           ffmpeg -version
       - name: Convert queued videos
         env:
