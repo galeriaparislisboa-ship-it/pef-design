@@ -512,34 +512,37 @@ function setupActiveVideoPlayback(){
  const videos=[...feed.querySelectorAll('.item video')];
  if(!videos.length)return;
  let active=null;
- const activate=v=>{
-  if(!v)return;
-  if(!v.getAttribute('src')&&v.dataset.src){
-   v.src=v.dataset.src;v.preload='auto';v.load();
-  }
+ const activate=(v,priority=false)=>{
+  if(!v||v.getAttribute('src')||!v.dataset.src)return;
+  v.preload=priority?'auto':'metadata';
+  v.src=v.dataset.src;
+  v.load();
  };
  const sync=()=>{
   if(feed.classList.contains('hidden')){for(const v of videos){v.pause();v.muted=true}return}
   const viewport=feed.getBoundingClientRect();
-  let best=null,bestRatio=0;
-  for(const v of videos){
-   const rect=v.closest('.item').getBoundingClientRect();
+  let best=null,bestRatio=0,bestIndex=-1;
+  for(let i=0;i<videos.length;i++){
+   const v=videos[i],rect=v.closest('.item').getBoundingClientRect();
    const overlap=Math.max(0,Math.min(rect.bottom,viewport.bottom)-Math.max(rect.top,viewport.top));
    const ratio=overlap/Math.max(1,Math.min(rect.height,viewport.height));
-   if(ratio>bestRatio){best=v;bestRatio=ratio}
+   if(ratio>bestRatio){best=v;bestRatio=ratio;bestIndex=i}
   }
-  const next=bestRatio>=0.55?best:null;
+  // Start as soon as a video occupies a meaningful part of the viewport.
+  const next=bestRatio>=0.25?best:null;
   if(next!==active){
    for(const v of videos){if(v!==next){v.pause();v.muted=true}}
    active=next;
   }
   if(active){
-   activate(active);
+   activate(active,true);
    active.muted=!feedSoundOn;
    if(active.paused)active.play().catch(()=>{if(feedSoundOn){active.muted=true;active.play().catch(()=>{})}});
   }
+  // Warm only the next video: faster swipe, no mass downloading of the feed.
+  if(bestIndex>=0&&bestIndex+1<videos.length)activate(videos[bestIndex+1],false);
  };
- playbackObserver=new IntersectionObserver(sync,{root:feed,threshold:[0,0.25,0.55,0.75,1]});
+ playbackObserver=new IntersectionObserver(sync,{root:feed,threshold:[0,0.1,0.25,0.5,0.75,1]});
  videos.forEach(v=>playbackObserver.observe(v.closest('.item')));
  feed.addEventListener('scroll',sync,{passive:true,signal:feedPlaybackAbort.signal});
  requestAnimationFrame(sync);
