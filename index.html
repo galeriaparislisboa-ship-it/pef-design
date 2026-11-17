@@ -465,7 +465,28 @@ let pefFeedPositionId=null;
 function pefRememberPosition(){const feed=document.getElementById('feed');if(!feed||!feed.children.length)return;const node=feed.children[Math.min(feed.children.length-1,Math.round(feed.scrollTop/Math.max(1,feed.clientHeight)))];if(node)pefFeedPositionId=node.dataset.pefId}
 function pefRememberSeen(id){/* viewing metrics are tracked separately */ }
 function pefRestorePosition(){if(!pefFeedPositionId)return;const feed=document.getElementById('feed');const node=Array.from(feed.children).find(el=>el.dataset.pefId===pefFeedPositionId);if(node)feed.scrollTop=node.offsetTop}
-function orderedFeed(){const indexed=items.map((x,i)=>({...x,index:i,pefKey:String(x.id??('local-'+i))}));const popular=[...indexed].sort((a,b)=>(b.likes||0)-(a.likes||0)||String(b.createdAt||b.id||'').localeCompare(String(a.createdAt||a.id||'')));const recent=[...indexed].sort((a,b)=>String(b.createdAt||b.id||'').localeCompare(String(a.createdAt||a.id||'')));const used=new Set(),out=[];for(let i=0;out.length<indexed.length;i++){for(const pool of [popular,recent]){const next=pool.find(x=>!used.has(x.index));if(next){used.add(next.index);out.push(next)}}}return out}
+// Stable per-session discovery mix: avoid chronological ordering and keep scroll stable on rerender.
+const pefFeedMixSeed=(()=>{try{let seed=sessionStorage.getItem('pef_feed_mix_seed');if(!seed){seed=String(Math.floor(Math.random()*2147483647));sessionStorage.setItem('pef_feed_mix_seed',seed)}return Number(seed)||1}catch(e){return Math.floor(Math.random()*2147483647)}})();
+function pefFeedMixScore(key){
+ let hash=pefFeedMixSeed|0;
+ for(const ch of String(key)){hash=Math.imul(hash^ch.charCodeAt(0),16777619)}
+ hash^=hash>>>16;hash=Math.imul(hash,0x7feb352d);hash^=hash>>>15;
+ return (hash>>>0)/4294967296;
+}
+function orderedFeed(){
+ const indexed=items.map((x,i)=>({...x,index:i,pefKey:String(x.id??('local-'+i))}));
+ // Half discovery (mixed randomly), half popular (likes), without duplicates.
+ const discovery=[...indexed].sort((a,b)=>pefFeedMixScore(a.pefKey)-pefFeedMixScore(b.pefKey));
+ const popular=[...indexed].sort((a,b)=>(b.likes||0)-(a.likes||0)||pefFeedMixScore(a.pefKey)-pefFeedMixScore(b.pefKey));
+ const used=new Set(),out=[];
+ while(out.length<indexed.length){
+  for(const pool of [discovery,popular]){
+   const next=pool.find(x=>!used.has(x.index));
+   if(next){used.add(next.index);out.push(next)}
+  }
+ }
+ return out;
+}
 
 let feedSoundOn=true;let playbackObserver=null;let feedPlaybackAbort=new AbortController();function toggleFeedSound(button){feedSoundOn=!feedSoundOn;document.querySelectorAll("#feed .item video").forEach(v=>{if(!v.paused){v.muted=!feedSoundOn;v.defaultMuted=!feedSoundOn}});document.querySelectorAll("#feed .sound-toggle").forEach(b=>{b.setAttribute("aria-label",feedSoundOn?"Mute video":"Unmute video");b.setAttribute("title",feedSoundOn?"Sound off":"Sound on");b.classList.toggle("sound-on",feedSoundOn)})}let viewObserver;function videoLoadingState(v,state){const box=v.closest('.item');if(!box)return;const badge=box.querySelector('.video-loading');if(!badge)return;if(state==='ready'){badge.hidden=true;return}badge.hidden=false;badge.textContent=state==='error'?'Video unavailable — try again later':'◌ Loading video…';badge.classList.toggle('video-error',state==='error')}
 function enforcePortraitFeed(video){if(!video||!video.videoWidth||!video.videoHeight)return;const isLandscape=video.videoWidth>video.videoHeight*1.12;video.classList.toggle('pef-rotate-landscape',isLandscape);}
