@@ -617,8 +617,33 @@ async function pefUploadSellerAvatar(input){
   pefSetOwnerAvatar(url);status.textContent='Profile photo saved.';
  }catch(error){status.textContent='Photo upload failed: '+(error?.message||String(error))}
 }
-async function pefLoadInstagramUsername(){if(!sb)return;const input=document.getElementById('pefInstagramUsername');if(!input)return;const {data:auth}=await sb.auth.getUser();if(!auth?.user)return;const {data,error}=await sb.from('pef_seller_profiles').select('instagram_username').eq('user_id',auth.user.id).maybeSingle();if(!error)input.value=data?.instagram_username||''}
-async function pefSaveInstagramUsername(){const input=document.getElementById('pefInstagramUsername'),status=document.getElementById('pefInstagramStatus');let name=input.value.trim().replace(/^@/,'');if(name&&!/^[A-Za-z0-9._]{1,30}$/.test(name)){status.textContent='Enter a valid Instagram username.';return}const {data:auth}=await sb.auth.getUser();if(!auth?.user){status.textContent='Sign in first.';return}const {error}=await sb.from('pef_seller_profiles').upsert({user_id:auth.user.id,instagram_username:name||null},{onConflict:'user_id'});status.textContent=error?'Unable to save: '+error.message:name?'Instagram connected to your seller profile.':'Instagram removed.';status.dataset.connected=(!error&&name)?'true':'false';if(!error)input.value=name}
+async function pefLoadInstagramUsername(){
+ if(!sb)return;
+ const input=document.getElementById('pefInstagramUsername'),status=document.getElementById('pefInstagramStatus');
+ if(!input||!status)return;
+ const {data:auth}=await sb.auth.getUser();
+ if(!auth?.user){input.value='';status.textContent='Sign in to manage Instagram.';status.dataset.connected='false';return}
+ const {data,error}=await sb.from('pef_seller_profiles').select('instagram_username').eq('user_id',auth.user.id).maybeSingle();
+ if(error){status.textContent='Could not load saved Instagram username.';status.dataset.connected='false';return}
+ input.value=data?.instagram_username||'';
+ status.textContent=input.value?'Instagram username saved. Checking connection…':'Enter your Instagram username.';
+ status.dataset.connected='false';
+ if(input.value.replace(/^@/,'').toLowerCase()==='galerie_paris_lisbon'){
+  try{const response=await fetch('/api/instagram/media',{cache:'no-store'});const result=await response.json();if(!response.ok)throw Error(result.error||'Instagram API error');status.textContent='Instagram API connected · '+(result.media?.length||0)+' posts loaded';status.dataset.connected='true'}
+  catch(e){status.textContent='Username saved · Instagram API unavailable ('+e.message+')';status.dataset.connected='false'}
+ }
+}
+async function pefSaveInstagramUsername(){
+ const input=document.getElementById('pefInstagramUsername'),status=document.getElementById('pefInstagramStatus');
+ let name=input.value.trim().replace(/^@/,'');
+ if(name&&!/^[A-Za-z0-9._]{1,30}$/.test(name)){status.textContent='Enter a valid Instagram username.';return}
+ const {data:auth}=await sb.auth.getUser();if(!auth?.user){status.textContent='Sign in first.';return}
+ const {error}=await sb.from('pef_seller_profiles').upsert({user_id:auth.user.id,instagram_username:name||null},{onConflict:'user_id'});
+ if(error){status.textContent='Unable to save: '+error.message;status.dataset.connected='false';return}
+ input.value=name;
+ await pefLoadInstagramUsername();
+ await pefLoadOwnerInstagram();
+}
 async function pefLoadOwnerInstagram(){
  const host=document.getElementById('pefInstagramConnect');if(!host||!sb)return;
  host.querySelector('.pef-instagram-gallery')?.remove();
