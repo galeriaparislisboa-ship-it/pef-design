@@ -684,10 +684,12 @@ function pefOpenInstagramPost(post){
  viewer.style.cssText='position:fixed;inset:0;z-index:99999;background:#080808;display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)';
  const close=document.createElement('button');close.textContent='✕';close.setAttribute('aria-label','Close');close.style.cssText='position:absolute;top:max(18px,env(safe-area-inset-top));right:18px;z-index:2;border:0;background:#333;color:white;border-radius:50%;width:44px;height:44px;font-size:20px';
  const content=document.createElement('div');content.style.cssText='width:100%;max-width:700px;max-height:85dvh;display:flex;align-items:center;justify-content:center';
+ const backdrop=document.createElement('div');backdrop.style.cssText='position:absolute;inset:-30px;background-position:center;background-size:cover;filter:blur(30px) brightness(.55);pointer-events:none';
  const slides=post.slides?.length?post.slides:[post];let index=0;
  const counter=document.createElement('span');counter.style.cssText='position:absolute;bottom:max(26px,env(safe-area-inset-bottom));color:#fff;font:14px -apple-system,Arial';
  function renderSlide(){
   content.replaceChildren();const item=slides[index];const isVideo=item.type==='VIDEO'&&!!item.video;
+  const source=item.image||post.image||'';backdrop.style.backgroundImage=source?'url('+JSON.stringify(source)+')':'none';
   const frame=document.createElement('div');frame.style.cssText='position:relative;display:flex;align-items:center;justify-content:center;width:100%;max-height:85dvh';
   if(isVideo){
    const video=document.createElement('video');video.src=item.video;video.poster=item.image||post.image||'';video.controls=true;video.preload='metadata';video.playsInline=true;video.setAttribute('playsinline','');video.style.cssText='display:block;max-width:100%;max-height:80dvh;width:100%;height:auto;object-fit:contain;background:#000';
@@ -704,7 +706,7 @@ function pefOpenInstagramPost(post){
  const dismiss=()=>{viewer.querySelector('video')?.pause();viewer.remove();document.removeEventListener('keydown',keyHandler)};
  const keyHandler=e=>{if(e.key==='Escape')dismiss();if(e.key==='ArrowLeft'&&slides.length>1)prev.click();if(e.key==='ArrowRight'&&slides.length>1)next.click()};
  close.onclick=dismiss;viewer.onclick=e=>{if(e.target===viewer)dismiss()};document.addEventListener('keydown',keyHandler);
- viewer.append(content,close,prev,next,counter);document.body.append(viewer);renderSlide();close.focus();
+ viewer.append(backdrop,content,close,prev,next,counter);document.body.append(viewer);renderSlide();close.focus();
 }
 function pefInstagramTile(post){
  const tile=document.createElement('button');tile.type='button';tile.className='pef-instagram-tile';tile.setAttribute('aria-label','View Instagram publication in PEF');tile.style.cssText='border:0;padding:0;cursor:pointer;position:relative';
