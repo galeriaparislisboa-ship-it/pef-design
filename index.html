@@ -390,7 +390,7 @@ html,body{margin:0!important;padding:0!important;width:100%!important;overflow-x
 html,body,.app,#feed,.feed,.nav{border-radius:0!important;clip-path:none!important}
 .nav{left:0!important;right:0!important;width:100%!important;max-width:100%!important;transform:none!important;border-bottom-left-radius:0!important;border-bottom-right-radius:0!important;overflow:visible!important}
 body{background:#101010!important}
-.pef-photo-capture{display:flex;align-items:center;gap:12px;margin:12px 0;flex-wrap:wrap}.pef-photo-capture button{background:#242424;color:#fff;border:1px solid #aaa;padding:12px 16px;border-radius:8px}.pef-photo-capture span{font-size:12px;flex:1;min-width:170px}.pef-photo-preview .pef-photo-tile{position:relative;flex:0 0 auto}.pef-photo-preview .pef-photo-tile img{display:block;height:120px;max-width:105px;object-fit:cover}.pef-remove-photo{position:absolute;top:4px;right:4px;width:29px;height:29px;border-radius:50%;background:#101010e8;color:#fff;border:1px solid #fff;font-size:23px;line-height:24px;padding:0}.pef-photo-picker{padding:16px 0 8px}.pef-photo-picker-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:16px;font-weight:600;margin-bottom:12px}.pef-photo-picker-title span{font-size:12px;font-weight:400;color:#a7a7a7}.pef-photo-picker-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pef-photo-picker-actions button{display:flex;align-items:center;justify-content:center;gap:9px;min-height:54px;background:#242424;border:1px solid #474747;border-radius:14px;color:#f2f0eb;font-size:15px;font-weight:500;-webkit-tap-highlight-color:transparent}.pef-photo-picker-actions button:active{background:#393939}.pef-photo-picker-actions svg{width:21px;height:21px;flex-shrink:0}</style><style id="pef-edit-refresh">
+.pef-photo-capture{display:flex;align-items:center;gap:12px;margin:12px 0;flex-wrap:wrap}.pef-photo-capture button{background:#242424;color:#fff;border:1px solid #aaa;padding:12px 16px;border-radius:8px}.pef-photo-capture span{font-size:12px;flex:1;min-width:170px}.pef-photo-preview .pef-photo-tile{position:relative;flex:0 0 auto}.pef-photo-preview .pef-photo-tile img{display:block;height:120px;max-width:105px;object-fit:cover}.pef-remove-photo{position:absolute;top:4px;right:4px;width:29px;height:29px;border-radius:50%;background:#101010e8;color:#fff;border:1px solid #fff;font-size:23px;line-height:24px;padding:0}.pef-photo-picker{padding:16px 0 8px}.pef-photo-picker-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:16px;font-weight:600;margin-bottom:12px}.pef-photo-picker-title span{font-size:12px;font-weight:400;color:#a7a7a7}.pef-photo-picker-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pef-photo-picker-actions button{display:flex;align-items:center;justify-content:center;gap:9px;min-height:54px;background:#242424;border:1px solid #474747;border-radius:14px;color:#f2f0eb;font-size:15px;font-weight:500;-webkit-tap-highlight-color:transparent}.pef-photo-picker-actions button:active{background:#393939}.pef-photo-picker-actions svg{width:21px;height:21px;flex-shrink:0}.pef-video-loading{position:absolute;z-index:12;top:50%;left:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:20px;background:#000b;color:#fff;font:500 12px system-ui,sans-serif;pointer-events:none;white-space:nowrap}.pef-video-loading[hidden]{display:none!important}</style><style id="pef-edit-refresh">
 .pef-edit-panel{margin-top:18px;padding:20px;border:1px solid #383838;border-radius:22px;background:#191919;color:#f7f7f7}
 .pef-edit-top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:22px}
 .pef-edit-panel label{font-weight:650;font-size:15px}
@@ -523,14 +523,39 @@ function setupActiveVideoPlayback(){
  const videos=[...feed.querySelectorAll('.item video')];
  if(!videos.length)return;
  let active=null;
+ const state=new WeakMap();
+ const badge=(v,show)=>{
+  const item=v.closest('.item');if(!item)return;
+  let el=item.querySelector('.pef-video-loading');
+  if(!el){el=document.createElement('span');el.className='pef-video-loading';el.textContent='Loading video…';el.setAttribute('role','status');item.appendChild(el)}
+  el.hidden=!show;
+ };
  const activate=(v,priority=false)=>{
   if(!v||v.getAttribute('src')||!v.dataset.src)return;
-  v.preload=priority?'auto':'metadata';
-  v.src=v.dataset.src;
-  v.load();
+  v.preload=priority?'auto':'metadata';v.src=v.dataset.src;v.load();
  };
+ const hasBuffer=(v)=>{
+  if(v.readyState<3)return false;
+  try{for(let i=0;i<v.buffered.length;i++)if(v.buffered.start(i)<=v.currentTime+.1&&v.buffered.end(i)-v.currentTime>=Math.min(1.2,Math.max(.35,(v.duration||10)-v.currentTime-.1)))return true}catch(e){}
+  return v.readyState>=4;
+ };
+ const playReady=v=>{
+  if(v!==active||!hasBuffer(v))return;
+  badge(v,false);
+  v.muted=!feedSoundOn;
+  if(v.paused)v.play().catch(()=>{if(feedSoundOn){v.muted=true;v.play().catch(()=>{})}});
+ };
+ videos.forEach(v=>{
+  v.addEventListener('waiting',()=>{if(v===active)badge(v,true)});
+  v.addEventListener('stalled',()=>{if(v===active)badge(v,true)});
+  v.addEventListener('playing',()=>{if(v===active)badge(v,false)});
+  v.addEventListener('canplay',()=>playReady(v));
+  v.addEventListener('canplaythrough',()=>playReady(v));
+  v.addEventListener('progress',()=>playReady(v));
+  v.addEventListener('error',()=>{if(v===active){const el=v.closest('.item')?.querySelector('.pef-video-loading');if(el){el.textContent='Video unavailable';el.hidden=false}}});
+ });
  const sync=()=>{
-  if(feed.classList.contains('hidden')){for(const v of videos){v.pause();v.muted=true}return}
+  if(feed.classList.contains('hidden')){for(const v of videos){v.pause();v.muted=true;badge(v,false)}active=null;return}
   const viewport=feed.getBoundingClientRect();
   let best=null,bestRatio=0,bestIndex=-1;
   for(let i=0;i<videos.length;i++){
@@ -539,26 +564,19 @@ function setupActiveVideoPlayback(){
    const ratio=overlap/Math.max(1,Math.min(rect.height,viewport.height));
    if(ratio>bestRatio){best=v;bestRatio=ratio;bestIndex=i}
   }
-  // Start as soon as a video occupies a meaningful part of the viewport.
-  const next=bestRatio>=0.25?best:null;
+  const next=bestRatio>=.25?best:null;
   if(next!==active){
-   for(const v of videos){if(v!==next){v.pause();v.muted=true}}
+   for(const v of videos)if(v!==next){v.pause();v.muted=true;badge(v,false)}
    active=next;
+   if(active){badge(active,true);activate(active,true)}
   }
-  if(active){
-   activate(active,true);
-   active.muted=!feedSoundOn;
-   if(active.paused)active.play().catch(()=>{if(feedSoundOn){active.muted=true;active.play().catch(()=>{})}});
-  }
-  // Warm only the next video: faster swipe, no mass downloading of the feed.
+  if(active)playReady(active);
   if(bestIndex>=0&&bestIndex+1<videos.length)activate(videos[bestIndex+1],false);
-  for(let i=0;i<videos.length;i++){
-   if(Math.abs(i-bestIndex)>2&&videos[i]!==active&&videos[i].hasAttribute('src')){
-    videos[i].pause();videos[i].removeAttribute('src');videos[i].preload='none';videos[i].load();
-   }
+  for(let i=0;i<videos.length;i++)if(Math.abs(i-bestIndex)>2&&videos[i]!==active&&videos[i].hasAttribute('src')){
+   videos[i].pause();videos[i].removeAttribute('src');videos[i].preload='none';videos[i].load();
   }
  };
- playbackObserver=new IntersectionObserver(sync,{root:feed,threshold:[0,0.1,0.25,0.5,0.75,1]});
+ playbackObserver=new IntersectionObserver(sync,{root:feed,threshold:[0,.1,.25,.5,.75,1]});
  videos.forEach(v=>playbackObserver.observe(v.closest('.item')));
  feed.addEventListener('scroll',sync,{passive:true,signal:feedPlaybackAbort.signal});
  requestAnimationFrame(sync);
