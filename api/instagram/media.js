@@ -22,7 +22,7 @@ module.exports = async function handler(req,res) {
     // directly, and only expose a playable URL when Meta actually supplies one.
     const entries=(payload.media?.data||[]).slice(0,12);
     const videoDiagnostics=[];
-    await Promise.all(entries.filter(p=>p.media_type==='VIDEO'&&!p.media_url).map(async p=>{
+    await Promise.all(entries.filter(p=>p.media_type==='VIDEO').map(async p=>{
       try{
         const detailUrl='https://'+host+'/v24.0/'+encodeURIComponent(p.id)+'?fields=media_type,media_url,thumbnail_url,media_audio_type,permalink';
         const detailRes=await fetch(detailUrl,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(6000)});
@@ -30,6 +30,15 @@ module.exports = async function handler(req,res) {
         if(detailRes.ok){if(detail.media_url)p.media_url=detail.media_url;if(detail.media_audio_type)p.media_audio_type=detail.media_audio_type;if(detail.permalink)p.permalink=detail.permalink;if(detail.thumbnail_url&&!p.thumbnail_url)p.thumbnail_url=detail.thumbnail_url;}
         videoDiagnostics.push({id:p.id,httpStatus:detailRes.status,mediaUrlAvailable:!!detail.media_url,audioType:detail.media_audio_type||null,permalinkAvailable:!!detail.permalink,errorCode:detail.error?.code||null,errorSubcode:detail.error?.error_subcode||null});
       }catch(e){videoDiagnostics.push({id:p.id,httpStatus:null,mediaUrlAvailable:false,errorCode:'network_or_timeout'});console.warn('Instagram video detail lookup failed',p.id)}
+    }));
+    // Resolve carousel video children independently when nested API responses omit media_url.
+    await Promise.all(entries.flatMap(p=>(p.children?.data||[]).filter(x=>x.media_type==='VIDEO'&&!x.media_url)).map(async child=>{
+      try{
+        const detailUrl='https://'+host+'/v24.0/'+encodeURIComponent(child.id)+'?fields=media_type,media_url,thumbnail_url';
+        const response=await fetch(detailUrl,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(6000)});
+        const detail=await response.json();
+        if(response.ok){child.media_url=detail.media_url||child.media_url;child.thumbnail_url=detail.thumbnail_url||child.thumbnail_url;}
+      }catch(e){console.warn('Instagram carousel video lookup failed',child.id)}
     }));
     const media=entries.filter(p=>p.media_url||p.thumbnail_url).map(p=>({id:p.id,type:p.media_type,permalink:p.permalink||null,image:p.thumbnail_url||p.media_url,video:p.media_type==='VIDEO'?(p.media_url||null):null,slides:(p.children?.data||[]).map(x=>({type:x.media_type,image:x.thumbnail_url||x.media_url,video:x.media_type==='VIDEO'?(x.media_url||null):null}))}));
     const diagnosticRequested=req.query?.diagnostic==='1';
