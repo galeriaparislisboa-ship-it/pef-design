@@ -622,11 +622,32 @@ async function pefSaveInstagramUsername(){const input=document.getElementById('p
 async function pefLoadPublicInstagram(sellerId){
  const root=document.getElementById('pefPublicSellerContent');if(!root||!sb)return;
  const {data,error}=await sb.from('pef_seller_profiles').select('instagram_username').eq('user_id',sellerId).maybeSingle();
- if(error||!data?.instagram_username||root.dataset.sellerId!==String(sellerId))return;
+ if(error||root.dataset.sellerId!==String(sellerId))return;
+ const username=(data?.instagram_username||'').replace(/^@/,'').toLowerCase();
+ if(username!=='galerie_paris_lisbon')return; // Only this account has granted API access; never display its posts on other sellers.
  const section=document.createElement('section');section.className='pef-instagram-gallery';section.dataset.maxPosts='12';section.setAttribute('aria-label','Seller Instagram gallery');
- const title=document.createElement('h2');title.textContent='Instagram gallery';
- const note=document.createElement('p');note.textContent='Instagram gallery will appear here once the seller connects their account.';note.className='muted';
+ const title=document.createElement('h2');title.textContent='Instagram';
+ const note=document.createElement('p');note.textContent='Loading Instagram posts…';note.className='muted';
  section.append(title,note);root.append(section);
+ try{
+  const response=await fetch('/api/instagram/media');
+  const result=await response.json();
+  if(!response.ok)throw Error(result.error||'Instagram unavailable');
+  if(root.dataset.sellerId!==String(sellerId))return;
+  note.textContent='@'+(result.username||username);
+  const counts=document.createElement('p');counts.className='pef-instagram-counts';
+  counts.textContent=[result.followers!=null?Number(result.followers).toLocaleString()+' followers':null,result.following!=null?Number(result.following).toLocaleString()+' following':null,result.posts!=null?Number(result.posts).toLocaleString()+' posts':null].filter(Boolean).join(' · ');
+  if(counts.textContent)section.append(counts);
+  const grid=document.createElement('div');grid.className='pef-instagram-grid';
+  for(const post of (result.media||[]).slice(0,12)){
+   if(!post.image)continue;
+   const tile=document.createElement('div');tile.className='pef-instagram-tile';
+   const img=document.createElement('img');img.src=post.image;img.alt='Instagram publication';img.loading='lazy';img.referrerPolicy='no-referrer';
+   tile.append(img);grid.append(tile);
+  }
+  if(grid.childElementCount)section.append(grid);
+  else note.textContent='No Instagram posts available.';
+ }catch(e){note.textContent='Instagram posts are temporarily unavailable.';console.warn('Instagram gallery:',e.message)}
 }
 function openPEFPublicSeller(sellerId){if(!sellerId||!pefSellerBadges[sellerId]||pefSellerBadges[sellerId]==='none')return;const name=pefSellerNames[sellerId]||'Verified seller';const badge=pefBadgeLabels[pefSellerBadges[sellerId]]||'✓ Verified seller';const listings=items.filter(x=>String(x.sellerId)===String(sellerId)&&x.remote&&(x.photos?.length||x.url));const sold=listings.filter(x=>x.listingStatus==='sold').length;const root=document.getElementById('pefPublicSellerContent');root.dataset.sellerId=String(sellerId);const place=listings.find(x=>x.city||x.country);const locationLabel=[place?.city,place?.country].filter(Boolean).join(', ');const contact=listings.find(x=>x.phone);const contactDigits=String(contact?.phone||'').replace(/\D/g,'');const isFollowing=false;root.innerHTML=`<div class="pef-public-heading"><div class="pef-public-identity"><div class="pef-public-avatar" id="pefPublicAvatar" aria-label="Seller profile photo"><span>✦</span></div><div class="pef-public-identity-text"><span class="pef-public-badge">${escapeHTML(badge)}</span><h1>${escapeHTML(name)}</h1><div class="pef-public-meta"><span class="pef-meta-entry"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7l9-5Z"/><path d="m3 7 9 5 9-5M12 12v10"/></svg><span>${listings.length} objects${sold>=3?' · '+sold+' sold':''}</span></span>${locationLabel?`<span class="pef-meta-entry pef-seller-location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.6"/></svg><span>${escapeHTML(locationLabel)}</span></span>`:''}</div></div></div><div class="pef-public-buttons"><button type="button" class="pef-public-share" onclick="sharePEFPublicSeller('${sellerId}')" aria-label="Share seller page"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7.5 7.5M12 3l4.5 4.5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg><span>Share profile</span></button><div class="pef-seller-actions"><button type="button" class="pef-subscribe-button" onclick="togglePEFSellerFollow('${sellerId}')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M19 8v6m-3-3h6"/></svg><span>Subscribe</span></button>${contactDigits?`<a href="https://wa.me/${contactDigits}?text=${encodeURIComponent('Hello, I discovered your profile on PEF Design.')}" target="_blank" rel="noopener noreferrer">Contact via WhatsApp</a>`:''}</div></div></div><div class="pef-public-grid">${listings.map(x=>`<button type="button" class="pef-public-object" onclick="openPEFPublicObject('${x.id}')"><span class="pef-public-cover">${x.photos?.length?`<img src="${escapeHTML(x.photos[0])}" loading="lazy" alt="">`:x.url?`<video src="${escapeHTML(x.url)}" muted playsinline webkit-playsinline preload="auto" autoplay loop onerror="this.style.opacity='.25'"></video>`:''}</span><span class="pef-public-object-name">${escapeHTML(x.name)}</span><span class="pef-public-object-price">${escapeHTML(String(x.price))} € ${x.listingStatus==='sold'?'· SOLD':x.listingStatus==='reserved'?'· RESERVED':''}</span></button>`).join('')}</div>`;show('sellerPublic');pefPreparePublicVideos();pefRefreshPublicSellerDetails(sellerId);pefLoadPublicInstagram(sellerId)}
 const PEF_PENDING_SUBSCRIPTION='pef-pending-subscription-v1';
