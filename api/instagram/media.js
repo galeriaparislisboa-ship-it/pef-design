@@ -18,7 +18,17 @@ module.exports = async function handler(req,res) {
       const code=payload.error?.code||upstream.status;
       return res.status(502).json({error:code===190?'Instagram access token rejected by Meta':'Instagram API unavailable',code,subcode:payload.error?.error_subcode||null,action:code===190?'Regenerate the Instagram access token in Meta, replace INSTAGRAM_ACCESS_TOKEN in Vercel Production, then redeploy.':'Check Meta permissions and API configuration.'});
     }
-    const media=(payload.media?.data||[]).slice(0,12).filter(p=>p.media_url||p.thumbnail_url).map(p=>({id:p.id,type:p.media_type,image:p.thumbnail_url||p.media_url,video:p.media_type==='VIDEO'?p.media_url:null,slides:(p.children?.data||[]).map(x=>({type:x.media_type,image:x.thumbnail_url||x.media_url,video:x.media_type==='VIDEO'?x.media_url:null}))}));
+    // Meta sometimes omits media_url for VIDEO in nested media edges. Query each video
+    // directly, and only expose a playable URL when Meta actually supplies one.
+    const entries=(payload.media?.data||[]).slice(0,12);
+    await Promise.all(entries.filter(p=>p.media_type==='VIDEO'&&!p.media_url).map(async p=>{
+      try{
+        const detailUrl='https://'+host+'/v24.0/'+encodeURIComponent(p.id)+'?fields=media_type,media_url,thumbnail_url';
+        const detailRes=await fetch(detailUrl,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(6000)});
+        if(detailRes.ok){const detail=await detailRes.json();if(detail.media_url)p.media_url=detail.media_url;if(detail.thumbnail_url&&!p.thumbnail_url)p.thumbnail_url=detail.thumbnail_url;}
+      }catch(e){console.warn('Instagram video detail lookup failed',p.id)}
+    }));
+    const media=entries.filter(p=>p.media_url||p.thumbnail_url).map(p=>({id:p.id,type:p.media_type,image:p.thumbnail_url||p.media_url,video:p.media_type==='VIDEO'?(p.media_url||null):null,slides:(p.children?.data||[]).map(x=>({type:x.media_type,image:x.thumbnail_url||x.media_url,video:x.media_type==='VIDEO'?(x.media_url||null):null}))}));
     return res.status(200).json({username:payload.username||'galerie_paris_lisbon',followers:payload.followers_count??null,following:payload.follows_count??null,posts:payload.media_count??null,media});
   }catch(e){return res.status(502).json({error:'Instagram request failed'});}
 };
