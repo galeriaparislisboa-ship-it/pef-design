@@ -8,7 +8,10 @@ module.exports = async function handler(req,res) {
   const accountId='17841434467277923';
   const fields='id,username,followers_count,follows_count,media_count,media.limit(12){id,media_type,media_url,thumbnail_url,timestamp}';
   try {
-    const url='https://graph.instagram.com/v24.0/'+accountId+'?fields='+encodeURIComponent(fields);
+    // Unified Login issues Meta/Facebook tokens (EAAY...), which use graph.facebook.com.
+    // Instagram Login tokens use graph.instagram.com instead.
+    const host=token.startsWith('IG')?'graph.instagram.com':'graph.facebook.com';
+    const url='https://'+host+'/v24.0/'+accountId+'?fields='+encodeURIComponent(fields);
     const upstream=await fetch(url,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});
     const payload=await upstream.json();
     if(!upstream.ok||payload.error) {
