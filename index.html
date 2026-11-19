@@ -1065,8 +1065,6 @@ const content=document.createElement('div');content.id='pefProfileSignedIn';
 const children=Array.from(profile.children).filter(el=>el!==signin);
 children.forEach(el=>content.appendChild(el));
 profile.insertBefore(signin,profile.firstChild);profile.appendChild(content);
-// Keep the admin dashboard at the top of the signed-in gallery account, before seller tools.
-const adminPanel=content.querySelector('#pefAdminPanel');if(adminPanel){content.insertBefore(adminPanel,content.firstChild);adminPanel.style.margin='8px 0 18px'}
 window.pefSyncProfileAuth=function(){
 const loggedIn=!!window.currentUser || !!(typeof currentUser!=='undefined'&&currentUser);
 signin.style.display=loggedIn?'none':'';
