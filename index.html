@@ -531,9 +531,9 @@ function setupActiveVideoPlayback(){
   const item=v.closest('.item');if(!item)return;
   const old=item.querySelector('.pef-video-loading');if(old)old.hidden=true;
   const button=document.createElement('button');
-  button.type='button';button.textContent='▶';
-  button.setAttribute('aria-label','Play video on demand');
-  button.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:12;border:0;border-radius:50%;width:64px;height:64px;background:rgba(0,0,0,.65);color:#fff;font-size:25px;cursor:pointer;display:grid;place-items:center';
+  button.type='button';button.innerHTML='<svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="margin-left:3px"><path d="M8 5.5a1 1 0 0 1 1.53-.85l10 6.5a1 1 0 0 1 0 1.7l-10 6.5A1 1 0 0 1 8 18.5z"/></svg>';
+  button.setAttribute('aria-label','Lire la vidéo');
+  button.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:12;border:1px solid rgba(255,255,255,.42);border-radius:50%;width:68px;height:68px;background:rgba(28,28,30,.48);color:#fff;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 4px 22px rgba(0,0,0,.18);transition:transform .18s ease,background .18s ease;touch-action:manipulation';
   item.appendChild(button);buttons.set(v,button);
   button.addEventListener('click',async e=>{
    e.stopPropagation();
@@ -542,11 +542,11 @@ function setupActiveVideoPlayback(){
    active=v;
    if(!v.hasAttribute('src')&&v.dataset.src){v.preload='auto';v.src=v.dataset.src}
    v.muted=!feedSoundOn;
-   button.textContent='◌';button.hidden=false;
-   try{await v.play();button.textContent='▶';button.hidden=true}catch(error){button.textContent='▶';button.hidden=false}
+   button.innerHTML='<span style="font-size:24px;line-height:1">◌</span>';button.hidden=false;
+   try{await v.play();button.innerHTML='<svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="margin-left:3px"><path d="M8 5.5a1 1 0 0 1 1.53-.85l10 6.5a1 1 0 0 1 0 1.7l-10 6.5A1 1 0 0 1 8 18.5z"/></svg>';button.hidden=true}catch(error){button.innerHTML='<svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="margin-left:3px"><path d="M8 5.5a1 1 0 0 1 1.53-.85l10 6.5a1 1 0 0 1 0 1.7l-10 6.5A1 1 0 0 1 8 18.5z"/></svg>';button.hidden=false}
   });
-  v.addEventListener('ended',()=>{button.hidden=false;button.textContent='▶'});
-  v.addEventListener('pause',()=>{button.hidden=false;button.textContent='▶'});
+  v.addEventListener('ended',()=>{button.hidden=false;button.innerHTML='<svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="margin-left:3px"><path d="M8 5.5a1 1 0 0 1 1.53-.85l10 6.5a1 1 0 0 1 0 1.7l-10 6.5A1 1 0 0 1 8 18.5z"/></svg>'});
+  v.addEventListener('pause',()=>{button.hidden=false;button.innerHTML='<svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="margin-left:3px"><path d="M8 5.5a1 1 0 0 1 1.53-.85l10 6.5a1 1 0 0 1 0 1.7l-10 6.5A1 1 0 0 1 8 18.5z"/></svg>'});
  });
  const sync=()=>{
   if(feed.classList.contains('hidden')){if(active){stop(active);buttons.get(active).hidden=false;active=null}return}
