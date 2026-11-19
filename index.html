@@ -523,63 +523,41 @@ function setupActiveVideoPlayback(){
  const videos=[...feed.querySelectorAll('.item video')];
  if(!videos.length)return;
  let active=null;
- const state=new WeakMap();
- const badge=(v,show)=>{
-  const item=v.closest('.item');if(!item)return;
-  let el=item.querySelector('.pef-video-loading');
-  if(!el){el=document.createElement('span');el.className='pef-video-loading';el.textContent='Loading video…';el.setAttribute('role','status');item.appendChild(el)}
-  el.hidden=!show;
- };
- const activate=(v,priority=false)=>{
-  if(!v||v.getAttribute('src')||!v.dataset.src)return;
-  v.preload=priority?'auto':'metadata';v.src=v.dataset.src;v.load();
- };
- const hasBuffer=(v)=>{
-  if(v.readyState<3)return false;
-  try{for(let i=0;i<v.buffered.length;i++)if(v.buffered.start(i)<=v.currentTime+.1&&v.buffered.end(i)-v.currentTime>=Math.min(1.2,Math.max(.35,(v.duration||10)-v.currentTime-.1)))return true}catch(e){}
-  return v.readyState>=4;
- };
- const playReady=v=>{
-  if(v!==active||!hasBuffer(v))return;
-  badge(v,false);
-  v.muted=!feedSoundOn;
-  if(v.paused)v.play().catch(()=>{if(feedSoundOn){v.muted=true;v.play().catch(()=>{})}});
- };
+ const buttons=new WeakMap();
+ const stop=v=>{v.pause();v.muted=true;if(v.hasAttribute('src')){v.removeAttribute('src');v.preload='none';v.load()}};
  videos.forEach(v=>{
-  v.addEventListener('waiting',()=>{if(v===active)badge(v,true)});
-  v.addEventListener('stalled',()=>{if(v===active)badge(v,true)});
-  v.addEventListener('playing',()=>{if(v===active)badge(v,false)});
-  v.addEventListener('canplay',()=>playReady(v));
-  v.addEventListener('canplaythrough',()=>playReady(v));
-  v.addEventListener('progress',()=>playReady(v));
-  v.addEventListener('error',()=>{if(v===active){const el=v.closest('.item')?.querySelector('.pef-video-loading');if(el){el.textContent='Video unavailable';el.hidden=false}}});
+  v.pause();v.autoplay=false;v.removeAttribute('autoplay');v.preload='none';
+  if(v.hasAttribute('src')){v.dataset.src=v.dataset.src||v.getAttribute('src');stop(v)}
+  const item=v.closest('.item');if(!item)return;
+  const old=item.querySelector('.pef-video-loading');if(old)old.hidden=true;
+  const button=document.createElement('button');
+  button.type='button';button.textContent='▶';
+  button.setAttribute('aria-label','Play video on demand');
+  button.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:12;border:0;border-radius:50%;width:64px;height:64px;background:rgba(0,0,0,.65);color:#fff;font-size:25px;cursor:pointer;display:grid;place-items:center';
+  item.appendChild(button);buttons.set(v,button);
+  button.addEventListener('click',async e=>{
+   e.stopPropagation();
+   if(active&&active!==v){stop(active);buttons.get(active).hidden=false}
+   if(!v.paused){v.pause();button.hidden=false;return}
+   active=v;
+   if(!v.hasAttribute('src')&&v.dataset.src){v.preload='auto';v.src=v.dataset.src}
+   v.muted=!feedSoundOn;
+   button.textContent='◌';button.hidden=false;
+   try{await v.play();button.textContent='▶';button.hidden=true}catch(error){button.textContent='▶';button.hidden=false}
+  });
+  v.addEventListener('ended',()=>{button.hidden=false;button.textContent='▶'});
+  v.addEventListener('pause',()=>{button.hidden=false;button.textContent='▶'});
  });
  const sync=()=>{
-  if(feed.classList.contains('hidden')){for(const v of videos){v.pause();v.muted=true;badge(v,false)}active=null;return}
-  const viewport=feed.getBoundingClientRect();
-  let best=null,bestRatio=0,bestIndex=-1;
-  for(let i=0;i<videos.length;i++){
-   const v=videos[i],rect=v.closest('.item').getBoundingClientRect();
-   const overlap=Math.max(0,Math.min(rect.bottom,viewport.bottom)-Math.max(rect.top,viewport.top));
-   const ratio=overlap/Math.max(1,Math.min(rect.height,viewport.height));
-   if(ratio>bestRatio){best=v;bestRatio=ratio;bestIndex=i}
-  }
-  const next=bestRatio>=.25?best:null;
-  if(next!==active){
-   for(const v of videos)if(v!==next){v.pause();v.muted=true;badge(v,false)}
-   active=next;
-   if(active){badge(active,true);activate(active,true)}
-  }
-  if(active)playReady(active);
-  if(bestIndex>=0&&bestIndex+1<videos.length)activate(videos[bestIndex+1],false);
-  for(let i=0;i<videos.length;i++)if(Math.abs(i-bestIndex)>2&&videos[i]!==active&&videos[i].hasAttribute('src')){
-   videos[i].pause();videos[i].removeAttribute('src');videos[i].preload='none';videos[i].load();
-  }
+  if(feed.classList.contains('hidden')){if(active){stop(active);buttons.get(active).hidden=false;active=null}return}
+  if(!active)return;
+  const viewport=feed.getBoundingClientRect(),rect=active.closest('.item').getBoundingClientRect();
+  const overlap=Math.max(0,Math.min(rect.bottom,viewport.bottom)-Math.max(rect.top,viewport.top));
+  if(overlap/Math.max(1,Math.min(rect.height,viewport.height))<.25){stop(active);buttons.get(active).hidden=false;active=null}
  };
- playbackObserver=new IntersectionObserver(sync,{root:feed,threshold:[0,.1,.25,.5,.75,1]});
+ playbackObserver=new IntersectionObserver(sync,{root:feed,threshold:[0,.25,.5,1]});
  videos.forEach(v=>playbackObserver.observe(v.closest('.item')));
  feed.addEventListener('scroll',sync,{passive:true,signal:feedPlaybackAbort.signal});
- requestAnimationFrame(sync);
 }
 
 function render(){if(viewObserver)viewObserver.disconnect();if(playbackObserver)playbackObserver.disconnect();feedPlaybackAbort.abort();feedPlaybackAbort=new AbortController();document.getElementById('feed').innerHTML=orderedFeed().filter(x=>(x.url||x.photos?.length)&&(activeCategory==='All'||x.category===activeCategory)).map(x=>`<article class="item" data-index="${x.index}" data-pef-id="${x.pefKey}">${x.photos?.length?`<div class="pef-photo-carousel" aria-label="Photos of ${escapeHTML(x.name)}">${x.photos.map((url,i)=>`<div class="pef-photo-slide"><div class="pef-photo-blur" style="background-image:url(&quot;${escapeHTML(url)}&quot;)" aria-hidden="true"></div><img src="${escapeHTML(url)}" alt="${escapeHTML(x.name)} photo ${i+1}" loading="${i?'lazy':'eager'}"></div>`).join('')}</div><div class="pef-photo-dots">${x.photos.map((_,i)=>`<span class="${i===0?'active':''}"></span>`).join('')}</div>`:x.url?`<video data-src="${escapeHTML(x.url)}" playsinline loop muted preload="none"></video><div class="video-loading" role="status" aria-live="polite">◌ Loading video…</div>`:x.image?`<img class="inspiration-image" src="${x.image}" alt="${escapeHTML(x.name)}" loading="lazy">`:`<div class="placeholder">${x.emoji||"✦"}</div>`}<div class="caption">${pefSellerBadges[x.sellerId]&&pefSellerBadges[x.sellerId]!=='none'?`<div class="pef-seller-inline"><span class="pef-seller-inline-badge">${escapeHTML(pefBadgeLabels[pefSellerBadges[x.sellerId]]||'✓ Verified seller')}</span><button type="button" class="pef-public-seller-link" onclick="openPEFPublicSeller('${x.sellerId}')" aria-label="View seller profile"><span class="pef-seller-inline-name">${escapeHTML(pefSellerNames[x.sellerId]||'Verified seller')}</span><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div>`:''}<h2>${escapeHTML(x.name)}${x.listingStatus==="sold"?`<span class="pef-feed-status pef-feed-sold">SOLD</span>`:x.listingStatus==="reserved"?`<span class="pef-feed-status pef-feed-reserved">RESERVED</span>`:""}</h2>${x.description?`<p>${escapeHTML(x.description)}</p>`:''}<p>${escapeHTML([x.city,x.country].filter(Boolean).join(", "))} · ${x.demo?'<span class="demo-tag">Inspiration · demo image</span>':escapeHTML(String(x.price))+' €'+(x.negotiable?' · Negotiable':'')+(x.trade?' · Exchange accepted (similar value)':'')+(x.year?' · c. '+escapeHTML(x.year):'')}</p>${x.trade&&!x.demo?`<button type="button" onclick="proposeExchange(${x.index})" class="pef-exchange-cta">⇄ Propose an exchange</button>`:""}</div><div class="side"><button type="button" aria-label="Report this listing" title="Report this listing" onclick="pefReportListing(${x.index})" style="background:transparent;border:0;border-radius:0;box-shadow:none;text-shadow:none;filter:none;width:36px;height:36px;min-height:36px;font-size:20px;line-height:1;color:white;justify-self:center">⚑</button><button class="sound-toggle" type="button" aria-label="${feedSoundOn?'Mute video':'Unmute video'}" title="${feedSoundOn?'Sound off':'Sound on'}" onclick="toggleFeedSound(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path class="sound-wave" d="M16 9a5 5 0 0 1 0 6M18.5 6a9 9 0 0 1 0 12"/><path class="sound-slash" d="m17 9 5 6m0-6-5 6"/></svg></button><button aria-label="Save listing" onclick="like(${x.index})"><svg viewBox="0 0 24 24" aria-hidden="true" style="${favs.has(x.index)?'fill:white':'fill:none'}"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg></button><button class="share-icon" type="button" aria-label="Share listing" title="Share listing" onclick="shareListing(${x.index})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7 8m5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button><button class="contact-icon" aria-label="Contact seller on WhatsApp" title="Contact seller" onclick="contact(${x.index})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.5a8.2 8.2 0 0 1-12 7.3L3 20l1.5-5a8.2 8.2 0 1 1 15.7-3.5Z"/><path d="M8.6 8.4c.2-.3.5-.4.8-.2l1.2 1.4-.7 1.1c.8 1.5 1.8 2.5 3.4 3.3l1-.8 1.6 1.2c.3.3.2.6-.1.9-.7.8-1.8.9-2.7.5-2.5-1.1-4.5-3.1-5.5-5.5-.4-.9-.2-1.5 1-1.9Z"/></svg></button></div></article>`).join('');viewObserver=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting&&e.intersectionRatio>=0.65){const x=items[Number(e.target.dataset.index)];if(x){x.views=(x.views||0)+1;persistMetric(x);pefRememberSeen(x.id??('local-'+e.target.dataset.index));pefFeedPositionId=String(x.id??('local-'+e.target.dataset.index))}viewObserver.unobserve(e.target)}})},{root:document.getElementById('feed'),threshold:0.65});document.querySelectorAll('#feed .item').forEach(el=>viewObserver.observe(el));setupTrimPlayback();setupFeedVideoLoading();document.querySelectorAll('.pef-photo-carousel').forEach(carousel=>{carousel.addEventListener('scroll',()=>{const idx=Math.round(carousel.scrollLeft/Math.max(1,carousel.clientWidth));carousel.nextElementSibling?.querySelectorAll('span').forEach((dot,i)=>dot.classList.toggle('active',i===idx))},{passive:true})});pefRestorePosition();}
