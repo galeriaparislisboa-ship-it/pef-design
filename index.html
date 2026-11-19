@@ -568,7 +568,7 @@ function setupActiveVideoPlayback(){
 function pefFeedMedia(x){
  const photos=Array.isArray(x.photos)?x.photos:[];
  const keys=photos.map((_,i)=>'photo:'+i);if(x.url)keys.push('video');
- let order=[...(x.mediaOrder||[]).filter(k=>keys.includes(k)),...keys.filter(k=>!(x.mediaOrder||[]).includes(k))];if(x.sellerId===window.pefGallerySellerId&&x.url){order=keys.filter(k=>k!=='video');order.splice(1,0,'video')}
+ let order=[...(x.mediaOrder||[]).filter(k=>keys.includes(k)),...keys.filter(k=>!(x.mediaOrder||[]).includes(k))];if(x.url&&(!Array.isArray(x.mediaOrder)||!x.mediaOrder.length)){order=keys.filter(k=>k!=='video');order.splice(Math.min(1,order.length),0,'video')}
  if(order.length===1&&order[0]==='video')return '<video data-src="'+escapeHTML(x.url)+'" playsinline loop muted preload="none"></video><div class="video-loading" role="status" aria-live="polite">◌ Loading video…</div>';
  if(!order.length)return x.image?'<img class="inspiration-image" src="'+escapeHTML(x.image)+'" alt="'+escapeHTML(x.name)+'" loading="lazy">':'<div class="placeholder">✦</div>';
  return '<div class="pef-photo-carousel pef-mixed-carousel" aria-label="Media for '+escapeHTML(x.name)+'">'+order.map((key,i)=>{
