@@ -535,6 +535,11 @@ function setupActiveVideoPlayback(){
   button.setAttribute('aria-label','Lire la vidéo');
   button.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:12;border:1px solid rgba(255,255,255,.42);border-radius:50%;width:68px;height:68px;background:rgba(28,28,30,.48);color:#fff;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 4px 22px rgba(0,0,0,.18);transition:transform .18s ease,background .18s ease;touch-action:manipulation';
   item.appendChild(button);buttons.set(v,button);
+  const betaLabel=document.createElement('div');
+  betaLabel.textContent='Beta app — under maintenance';
+  betaLabel.setAttribute('aria-label','Beta app under maintenance');
+  betaLabel.style.cssText='position:absolute;top:calc(50% + 46px);left:50%;transform:translateX(-50%);z-index:12;color:#fff;font-size:11px;font-weight:500;letter-spacing:.02em;text-shadow:0 1px 5px rgba(0,0,0,.8);white-space:nowrap;pointer-events:none';
+  item.appendChild(betaLabel);
   button.addEventListener('click',async e=>{
    e.stopPropagation();
    if(active&&active!==v){stop(active);buttons.get(active).hidden=false}
