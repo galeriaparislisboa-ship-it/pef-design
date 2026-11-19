@@ -568,7 +568,7 @@ function setupActiveVideoPlayback(){
 function pefFeedMedia(x){
  const photos=Array.isArray(x.photos)?x.photos:[];
  const keys=photos.map((_,i)=>'photo:'+i);if(x.url)keys.push('video');
- const order=[...(x.mediaOrder||[]).filter(k=>keys.includes(k)),...keys.filter(k=>!(x.mediaOrder||[]).includes(k))];
+ let order=[...(x.mediaOrder||[]).filter(k=>keys.includes(k)),...keys.filter(k=>!(x.mediaOrder||[]).includes(k))];if(x.sellerId===window.pefGallerySellerId&&x.url){order=keys.filter(k=>k!=='video');order.splice(1,0,'video')}
  if(order.length===1&&order[0]==='video')return '<video data-src="'+escapeHTML(x.url)+'" playsinline loop muted preload="none"></video><div class="video-loading" role="status" aria-live="polite">◌ Loading video…</div>';
  if(!order.length)return x.image?'<img class="inspiration-image" src="'+escapeHTML(x.image)+'" alt="'+escapeHTML(x.name)+'" loading="lazy">':'<div class="placeholder">✦</div>';
  return '<div class="pef-photo-carousel pef-mixed-carousel" aria-label="Media for '+escapeHTML(x.name)+'">'+order.map((key,i)=>{
@@ -1015,7 +1015,7 @@ async function pefAdminVisibility(){const panel=document.getElementById('pefAdmi
 async function pefGalleryRefresh(){
  const panel=document.getElementById('pefGalleryPanel'),box=document.getElementById('pefGalleryListings');if(!panel||!box)return;
  const {data:userData}=await sb.auth.getUser();if((userData?.user?.email||'').toLowerCase()!=='galeriaparislisboa@gmail.com')return;
- panel.style.display='block';box.textContent='Loading gallery…';
+ panel.style.display='block';window.pefGallerySellerId=userData.user.id;box.textContent='Loading gallery…';
  const {data,error}=await sb.from('pef_objects').select('id,title,photos,video_url').eq('seller_id',userData.user.id).order('created_at',{ascending:false});
  if(error){box.textContent=error.message;return}box.replaceChildren();
  for(const row of data||[]){
