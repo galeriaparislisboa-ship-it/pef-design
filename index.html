@@ -968,12 +968,15 @@ function pefOpenInstagramPost(post){
   }else{const img=document.createElement('img');img.src=item.image||post.image;img.alt='Instagram publication';img.style.cssText='max-width:100%;max-height:85dvh;width:auto;height:auto;object-fit:contain';frame.append(img)}
   content.append(frame);counter.textContent=slides.length>1?(index+1)+' / '+slides.length:'';
  }
- const prev=document.createElement('button'),next=document.createElement('button');
- for(const [button,label,dir] of [[prev,'‹',-1],[next,'›',1]]){button.textContent=label;button.setAttribute('aria-label',dir<0?'Previous image':'Next image');button.style.cssText='position:absolute;'+(dir<0?'left:8px':'right:8px')+';top:50%;border:0;border-radius:50%;background:#333b;color:white;width:42px;height:42px;font-size:32px;display:'+(slides.length>1?'block':'none');button.onclick=()=>{index=(index+dir+slides.length)%slides.length;renderSlide()}}
+ // Touch-first Instagram carousel: swipe horizontally; no navigation arrows.
+ let touchStartX=0,touchStartY=0;
+ content.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;touchStartX=e.touches[0].clientX;touchStartY=e.touches[0].clientY},{passive:true});
+ content.addEventListener('touchend',e=>{if(slides.length<2||e.changedTouches.length!==1)return;const dx=e.changedTouches[0].clientX-touchStartX,dy=e.changedTouches[0].clientY-touchStartY;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.3){index=(index+(dx<0?1:-1)+slides.length)%slides.length;renderSlide()}},{passive:true});
+ content.style.touchAction='pan-y';
  const dismiss=()=>{viewer.querySelector('video')?.pause();viewer.remove();document.removeEventListener('keydown',keyHandler)};
- const keyHandler=e=>{if(e.key==='Escape')dismiss();if(e.key==='ArrowLeft'&&slides.length>1)prev.click();if(e.key==='ArrowRight'&&slides.length>1)next.click()};
+ const keyHandler=e=>{if(e.key==='Escape')dismiss();if(e.key==='ArrowLeft'&&slides.length>1){index=(index-1+slides.length)%slides.length;renderSlide()}if(e.key==='ArrowRight'&&slides.length>1){index=(index+1)%slides.length;renderSlide()}};
  close.onclick=dismiss;viewer.onclick=e=>{if(e.target===viewer)dismiss()};document.addEventListener('keydown',keyHandler);
- viewer.append(backdrop,content,close,prev,next,counter);document.body.append(viewer);renderSlide();close.focus();
+ viewer.append(backdrop,content,close,counter);document.body.append(viewer);renderSlide();close.focus();
 }
 function pefInstagramTile(post){
  const tile=document.createElement('button');tile.type='button';tile.className='pef-instagram-tile';tile.setAttribute('aria-label','View Instagram publication in PEF');tile.style.cssText='border:0;padding:0;cursor:pointer;position:relative';
