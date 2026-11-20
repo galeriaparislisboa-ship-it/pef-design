@@ -662,7 +662,25 @@ function setupActiveVideoPlayback(){
   v.addEventListener('ended',()=>{button.hidden=false;button.innerHTML='<svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="margin-left:3px"><path d="M8 5.5a1 1 0 0 1 1.53-.85l10 6.5a1 1 0 0 1 0 1.7l-10 6.5A1 1 0 0 1 8 18.5z"/></svg>'});
   v.addEventListener('pause',()=>{button.hidden=false;button.innerHTML='<svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="margin-left:3px"><path d="M8 5.5a1 1 0 0 1 1.53-.85l10 6.5a1 1 0 0 1 0 1.7l-10 6.5A1 1 0 0 1 8 18.5z"/></svg>'});
  });
+ const isCurrentSlide=v=>{const carousel=v.closest('.pef-mixed-carousel');if(!carousel)return true;const slide=v.closest('.pef-photo-slide');if(!slide)return false;const idx=[...carousel.children].indexOf(slide);return idx===Math.round(carousel.scrollLeft/Math.max(1,carousel.clientWidth))};
+ const isVisible=v=>{const item=v.closest('.item');if(!item||feed.classList.contains('hidden'))return false;const viewport=feed.getBoundingClientRect(),rect=item.getBoundingClientRect();const overlap=Math.max(0,Math.min(rect.bottom,viewport.bottom)-Math.max(rect.top,viewport.top));return overlap/Math.max(1,Math.min(rect.height,viewport.height))>=.65};
+ const syncAuto=()=>{
+  const target=videos.find(v=>isVisible(v)&&isCurrentSlide(v));
+  if(active&&active!==target){stop(active);buttons.get(active).hidden=false;active=null}
+  if(!target)return;
+  if(active===target&&!target.paused)return;
+  active=target;
+  const button=buttons.get(target);
+  if(!target.hasAttribute('src')&&target.dataset.src){target.preload='metadata';target.src=target.dataset.src}
+  target.muted=true;target.playsInline=true;
+  const play=target.play();
+  if(play&&typeof play.then==='function')play.then(()=>{button.hidden=true}).catch(()=>{button.hidden=false;active=null});
+ };
+ videos.forEach(v=>v.closest('.pef-mixed-carousel')?.addEventListener('scroll',()=>{requestAnimationFrame(syncAuto)},{passive:true,signal:feedPlaybackAbort.signal}));
+ feed.addEventListener('scroll',()=>{requestAnimationFrame(syncAuto)},{passive:true,signal:feedPlaybackAbort.signal});
+ requestAnimationFrame(syncAuto);
  const sync=()=>{
+  syncAuto();
   if(feed.classList.contains('hidden')){if(active){stop(active);buttons.get(active).hidden=false;active=null}return}
   if(!active)return;
   const viewport=feed.getBoundingClientRect(),rect=active.closest('.item').getBoundingClientRect();
@@ -677,7 +695,7 @@ function setupActiveVideoPlayback(){
 function pefFeedMedia(x){
  const photos=Array.isArray(x.photos)?x.photos:[];
  const keys=photos.map((_,i)=>'photo:'+i);if(x.url)keys.push('video');
- let order=[...(x.mediaOrder||[]).filter(k=>keys.includes(k)),...keys.filter(k=>!(x.mediaOrder||[]).includes(k))];if(x.url&&(!Array.isArray(x.mediaOrder)||!x.mediaOrder.length)){order=keys.filter(k=>k!=='video');order.splice(Math.min(1,order.length),0,'video')}
+ let order=keys.filter(k=>k!=='video');if(x.url)order.splice(Math.min(1,order.length),0,'video');
  if(order.length===1&&order[0]==='video')return '<video data-src="'+escapeHTML(x.url)+'" playsinline loop muted preload="none"></video><div class="video-loading" role="status" aria-live="polite">◌ Loading video…</div>';
  if(!order.length)return x.image?'<img class="inspiration-image" src="'+escapeHTML(x.image)+'" alt="'+escapeHTML(x.name)+'" loading="lazy">':'<div class="placeholder">✦</div>';
  return '<div class="pef-photo-carousel pef-mixed-carousel" aria-label="Media for '+escapeHTML(x.name)+'">'+order.map((key,i)=>{
