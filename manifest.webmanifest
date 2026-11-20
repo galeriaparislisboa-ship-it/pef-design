@@ -8,10 +8,10 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/pef-icon.svg",
+      "src": "/Ic%C3%B4ne%20PEF%20Design%20b%C3%AAta.png",
       "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
