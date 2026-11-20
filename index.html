@@ -1133,10 +1133,10 @@ restoreSellerPreferences();restorePendingDraft();document.querySelectorAll('#cre
 })();
 
 /* Secure server-checked moderation: only authenticated Supabase admins can call RPCs. */
-async function pefAdminVisibility(){const panel=document.getElementById('pefAdminPanel');if(!panel||!sb)return;panel.style.display='none';try{const {data:userResult}=await sb.auth.getUser();if(!userResult?.user)return;if((userResult.user.email||'').toLowerCase()==='galeriaparislisboa@gmail.com'){await pefGalleryRefresh();return}const {error}=await sb.rpc('pef_admin_list');if(error){console.info('Admin permissions:',error.message);return}panel.style.display='block';await pefAdminRefresh()}catch(e){console.warn('Admin check:',e)}}
+async function pefAdminVisibility(){const panel=document.getElementById('pefAdminPanel');if(!panel||!sb)return;panel.style.display='none';try{const {data:userResult}=await sb.auth.getUser();if(!userResult?.user)return;if((userResult.user.email||'').toLowerCase()==='ndondina@muchimuchi.fr'){const {error}=await sb.rpc('pef_admin_list');if(error){console.info('Admin permissions:',error.message);return}panel.style.display='block';await pefAdminRefresh();return}await pefGalleryRefresh()}catch(e){console.warn('Admin check:',e)}}
 async function pefGalleryRefresh(){
  const panel=document.getElementById('pefGalleryPanel'),box=document.getElementById('pefGalleryListings');if(!panel||!box||!sb)return;
- const {data:userData}=await sb.auth.getUser();if((userData?.user?.email||'').toLowerCase()!=='galeriaparislisboa@gmail.com')return;
+ const {data:userData}=await sb.auth.getUser();if(!userData?.user||((userData.user.email||'').toLowerCase()==='ndondina@muchimuchi.fr'))return;
  panel.style.display='block';window.pefGallerySellerId=userData.user.id;box.textContent='Loading gallery…';
  const {data,error}=await sb.from('pef_objects').select('id,title,photos,video_url').eq('seller_id',userData.user.id).order('created_at',{ascending:false});
  if(error){box.textContent=error.message;return}box.replaceChildren();
