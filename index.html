@@ -1497,4 +1497,32 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 .pef-gallery-status{border-radius:9px;padding:7px 10px;font-size:12px;background:#f4d5d9;color:#78303b}
 .pef-gallery-status[data-complete=yes]{background:#dcebdc;color:#315d3e}
 .pef-gallery-hint{font-size:12px;color:#b9b9bb;line-height:1.5}
-</style></body></html>
+</style><style id="pef-admin-listing-accordion-v3">
+#profile.pef-admin-mode #pefAdminContent .pef-admin-listing-fold{border-top:1px solid #e5e5ea;background:#fff;color:#1c1c1e}
+#profile.pef-admin-mode #pefAdminContent .pef-admin-listing-fold>summary{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;list-style:none;font-size:13px}
+#profile.pef-admin-mode #pefAdminContent .pef-admin-listing-fold>summary::-webkit-details-marker{display:none}
+#profile.pef-admin-mode #pefAdminContent .pef-admin-listing-fold>summary img{width:46px;height:46px;object-fit:cover;border-radius:9px;background:#eee}
+#profile.pef-admin-mode #pefAdminContent .pef-admin-listing-fold>summary .pef-fold-text{flex:1;min-width:0;overflow-wrap:anywhere}
+#profile.pef-admin-mode #pefAdminContent .pef-admin-listing-fold>summary small{display:block;color:#6e6e73;margin-top:3px}
+#profile.pef-admin-mode #pefAdminContent .pef-admin-listing-fold>article{padding:12px!important;margin:0!important;display:block!important;background:#fafafa!important;border-top:1px solid #e5e5ea!important}
+#profile.pef-admin-mode #pefAdminContent .pef-admin-listing-fold>article>div{margin-bottom:10px}
+</style><script>
+(function(){
+function foldListings(){
+ const root=document.querySelector('#profile.pef-admin-mode #pefAdminContent');if(!root)return;
+ root.querySelectorAll('.pef-app-admin-seller-group > article:not([data-pef-folded])').forEach(card=>{
+ card.dataset.pefFolded='1';
+ const title=card.querySelector('h3')?.textContent?.trim()||'Untitled';
+ const info=card.querySelector('p')?.textContent?.trim()||'';
+ const img=card.querySelector('img');
+ const fold=document.createElement('details');fold.className='pef-admin-listing-fold';
+ const summary=document.createElement('summary');
+ if(img){const thumb=document.createElement('img');thumb.src=img.src;thumb.alt='';thumb.loading='lazy';summary.append(thumb)}
+ const words=document.createElement('span');words.className='pef-fold-text';const strong=document.createElement('strong');strong.textContent=title;const small=document.createElement('small');small.textContent=info.slice(0,85);words.append(strong,small);summary.append(words);
+ const arrow=document.createElement('span');arrow.textContent='⌄';summary.append(arrow);
+ fold.append(summary);card.replaceWith(fold);fold.append(card);
+ });
+}
+document.addEventListener('DOMContentLoaded',()=>{const root=document.getElementById('pefAdminContent');if(!root)return;new MutationObserver(()=>{if(document.getElementById('profile')?.classList.contains('pef-admin-mode'))foldListings()}).observe(root,{childList:true,subtree:true});foldListings()});
+})();
+</script></body></html>
