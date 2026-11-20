@@ -1258,7 +1258,7 @@ document.getElementById('feed')?.addEventListener('scroll',pefCheckInfiniteFeed,
  let startY=null,lastLoop=0;
  const atEnd=()=>feed.children.length>1&&feed.scrollHeight-feed.scrollTop-feed.clientHeight<Math.max(12,feed.clientHeight*.08);
  const ready=()=>!feed.classList.contains('hidden')&&!pefRemoteHasMore&&!pefRemoteRefreshBusy&&!pefFeedPagingBusy&&atEnd()&&Date.now()-lastLoop>650;
- function loop(){if(!ready())return false;lastLoop=Date.now();feed.scrollTo({top:0,behavior:'instant'});requestAnimationFrame(()=>{feed.dispatchEvent(new Event('scroll'));});return true}
+ function loop(){if(!ready())return false;lastLoop=Date.now();const cards=[...feed.querySelectorAll(':scope > .item')];if(cards.length>1){const shift=1+Math.floor(Math.random()*(cards.length-1));const reordered=cards.slice(shift).concat(cards.slice(0,shift));for(const card of reordered)feed.appendChild(card);pefFeedPositionId=reordered[0]?.dataset.pefId||null;}feed.scrollTo({top:0,behavior:'instant'});requestAnimationFrame(()=>{feed.dispatchEvent(new Event('scroll'));});return true}
  feed.addEventListener('touchstart',e=>{startY=e.touches[0]?.clientY??null},{passive:true});
  feed.addEventListener('touchend',e=>{if(startY===null)return;const delta=startY-(e.changedTouches[0]?.clientY??startY);startY=null;if(delta>35)loop()},{passive:true});
  feed.addEventListener('wheel',e=>{if(e.deltaY>8&&ready()){e.preventDefault();loop()}},{passive:false});
