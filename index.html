@@ -948,18 +948,23 @@ function pefOpenInstagramPost(post){
  const content=document.createElement('div');content.style.cssText='width:100%;max-width:700px;max-height:85dvh;display:flex;align-items:center;justify-content:center';
  const backdrop=document.createElement('div');backdrop.style.cssText='position:absolute;inset:-30px;background-position:center;background-size:cover;filter:blur(30px) brightness(.55);pointer-events:none';
  const slides=post.slides?.length?post.slides:[post];let index=0;
+ const originalUrl=typeof post.permalink==='string'&&/^https:\/\/(www\.)?instagram\.com\//i.test(post.permalink)?post.permalink:null;
  const counter=document.createElement('span');counter.style.cssText='position:absolute;bottom:max(26px,env(safe-area-inset-bottom));color:#fff;font:14px -apple-system,Arial';
  function renderSlide(){
-  content.replaceChildren();const item=slides[index];const isVideo=item.type==='VIDEO'&&!!item.video;
+  content.replaceChildren();const item=slides[index];const isVideo=item.type==='VIDEO';
   const source=item.image||post.image||'';backdrop.style.backgroundImage=source?'url('+JSON.stringify(source)+')':'none';
   const frame=document.createElement('div');frame.style.cssText='position:relative;display:flex;align-items:center;justify-content:center;width:100%;max-height:85dvh';
-  if(isVideo){
-   const video=document.createElement('video');video.src=item.video;video.poster=item.image||post.image||'';video.controls=true;video.preload='metadata';video.playsInline=true;video.setAttribute('playsinline','');video.style.cssText='display:block;max-width:100%;max-height:80dvh;width:100%;height:auto;object-fit:contain;background:#000';
+  if(isVideo&&!item.video){
+   const img=document.createElement('img');img.src=item.image||post.image||'';img.alt='Instagram video preview';img.style.cssText='max-width:100%;max-height:80dvh;object-fit:contain';frame.append(img);
+   const link=document.createElement('a');link.href=originalUrl||'https://www.instagram.com/';link.target='_blank';link.rel='noopener noreferrer';link.textContent='Watch on Instagram ↗';link.style.cssText='position:absolute;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 18px;background:#242424;color:#fff;border-radius:12px;text-decoration:none;font:600 14px -apple-system,Arial;white-space:nowrap';frame.append(link);
+  }else if(isVideo){
+   const video=document.createElement('video');video.src=item.video;video.poster=item.image||post.image||'';video.controls=true;video.preload='none';video.playsInline=true;video.setAttribute('playsinline','');video.style.cssText='display:block;max-width:100%;max-height:80dvh;width:100%;height:auto;object-fit:contain;background:#000';
+   const openOriginal=document.createElement('a');openOriginal.textContent='Watch on Instagram ↗';openOriginal.href=originalUrl||'https://www.instagram.com/';openOriginal.target='_blank';openOriginal.rel='noopener noreferrer';openOriginal.style.cssText='position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:3;padding:11px 16px;border-radius:12px;background:rgba(20,20,20,.88);border:1px solid #ffffff55;color:#fff;text-decoration:none;font:600 13px -apple-system,Arial;white-space:nowrap;display:none';
    const play=document.createElement('button');play.type='button';play.innerHTML='<svg viewBox="0 0 24 24" width="29" height="29" fill="white" aria-hidden="true"><path d="M8 5.7a1 1 0 0 1 1.5-.86l10 6.3a1 1 0 0 1 0 1.72l-10 6.3A1 1 0 0 1 8 18.3z"/></svg>';play.setAttribute('aria-label','Play video');play.style.cssText='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.35);border-radius:50%;background:rgba(0,0,0,.56);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;width:64px;height:64px;cursor:pointer;z-index:1';
    const message=document.createElement('p');message.style.cssText='position:absolute;bottom:8px;left:12px;right:12px;text-align:center;color:#fff;background:#000b;font:13px -apple-system,Arial;padding:8px;border-radius:8px;display:none';
-   const start=async()=>{try{await video.play();play.style.display='none';message.style.display='none'}catch(e){message.textContent='Playback unavailable. Tap the video controls to try again.';message.style.display='block'}};
-   play.onclick=start;video.addEventListener('play',()=>{play.style.display='none';message.style.display='none'});video.addEventListener('pause',()=>{if(!video.ended)play.style.display='block'});video.addEventListener('ended',()=>{play.style.display='block'});video.addEventListener('error',()=>{message.textContent='This Instagram video cannot be played right now.';message.style.display='block'});
-   frame.append(video,play,message);
+   const start=async()=>{try{await video.play();play.style.display='none';message.style.display='none'}catch(e){message.textContent='Video unavailable in PEF. Open it on Instagram.';message.style.display='block';openOriginal.style.display='block'}};
+   play.onclick=start;video.addEventListener('play',()=>{play.style.display='none';message.style.display='none'});video.addEventListener('pause',()=>{if(!video.ended)play.style.display='block'});video.addEventListener('ended',()=>{play.style.display='block'});video.addEventListener('error',()=>{message.textContent='This Instagram video cannot be played here.';message.style.display='block';openOriginal.style.display='block'});
+   frame.append(video,play,message,openOriginal);
   }else{const img=document.createElement('img');img.src=item.image||post.image;img.alt='Instagram publication';img.style.cssText='max-width:100%;max-height:85dvh;width:auto;height:auto;object-fit:contain';frame.append(img)}
   content.append(frame);counter.textContent=slides.length>1?(index+1)+' / '+slides.length:'';
  }
