@@ -1402,6 +1402,7 @@ videoRemove.addEventListener('click',()=>setTimeout(renderOrder,500));
 info.append(title,description,details,identity,photoEditor,videoEditor,orderEditor,button,deleteButton);card.append(media,info);
 const itemAccordion=document.createElement('details');itemAccordion.className='pef-app-admin-listing';const itemHeading=document.createElement('summary');const name=document.createElement('span');name.textContent=row.title||'Untitled';const badge=document.createElement('small');badge.textContent=(row.is_hidden?'Hidden':'Published')+' · '+(row.price!=null?row.price+' €':'No price');itemHeading.append(name,badge);itemAccordion.append(itemHeading,card);sellerAccordion.append(itemAccordion)}
 }
+}
 </script><script>
 /* Measure each listing caption (including optional seller badge, long details and exchange CTA). */
 (function(){let observer=null;function sync(){const feed=document.getElementById('feed');if(!feed)return;if(observer)observer.disconnect();observer=new ResizeObserver(entries=>{for(const entry of entries){const item=entry.target.closest('.item');if(item)item.style.setProperty('--pef-caption-height',Math.ceil(entry.target.getBoundingClientRect().height)+'px')}});feed.querySelectorAll('.item .caption').forEach(el=>observer.observe(el))}document.addEventListener('DOMContentLoaded',()=>{const feed=document.getElementById('feed');if(!feed)return;new MutationObserver(sync).observe(feed,{childList:true});sync()})})();
