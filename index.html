@@ -1641,7 +1641,7 @@ document.addEventListener('DOMContentLoaded',()=>{const root=document.getElement
 <!-- Cloudflare D1 beta feed: opt-in only, no media changes or production changes. -->
 <script>
 (() => {
-  if (new URLSearchParams(location.search).get('cloudflare-preview') !== '1') return;
+  if (new URLSearchParams(location.search).get('cloudflare-preview') !== '1' && !location.hostname.startsWith('pef-design-bs4xn2zv3-')) return;
   const endpoint = 'https://pef-design-api.galeriaparislisboa.workers.dev/api/text-listings';
   const root = document.createElement('section');
   root.setAttribute('aria-label','PEF Cloudflare beta feed');
