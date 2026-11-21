@@ -1638,52 +1638,47 @@ function foldListings(){
 document.addEventListener('DOMContentLoaded',()=>{const root=document.getElementById('pefAdminContent');if(!root)return;new MutationObserver(()=>{if(document.getElementById('profile')?.classList.contains('pef-admin-mode'))foldListings()}).observe(root,{childList:true,subtree:true});foldListings()});
 })();
 </script>
-<!-- Cloudflare D1 staging verification: read-only, opt-in; production behavior unchanged. -->
+<!-- Cloudflare D1 beta feed: opt-in only, no media changes or production changes. -->
 <script>
 (() => {
-  const params = new URLSearchParams(location.search);
-  if (params.get('cloudflare-preview') !== '1') return;
+  if (new URLSearchParams(location.search).get('cloudflare-preview') !== '1') return;
   const endpoint = 'https://pef-design-api.galeriaparislisboa.workers.dev/api/text-listings';
-  const panel = document.createElement('section');
-  panel.setAttribute('role', 'region');
-  panel.setAttribute('aria-label', 'Cloudflare staging preview');
-  panel.style.cssText = 'position:fixed;inset:0;z-index:999999;overflow:auto;background:#fff;color:#111;padding:24px 18px 100px;font:15px/1.5 -apple-system,BlinkMacSystemFont,Arial,sans-serif';
-  const heading = document.createElement('h1');
-  heading.textContent = 'PEF — Cloudflare staging';
-  heading.style.cssText = 'font-size:24px;margin:0 0 8px';
-  const status = document.createElement('p');
-  status.textContent = 'Loading D1 listings…';
-  const close = document.createElement('a');
-  close.href = location.pathname;
-  close.textContent = '← Back to PEF';
-  close.style.cssText = 'display:inline-block;margin:8px 0 20px;color:#111';
-  const list = document.createElement('div');
-  panel.append(heading, status, close, list);
-  document.body.append(panel);
-  const timeout = AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined;
-  fetch(endpoint, { method: 'GET', mode: 'cors', credentials: 'omit', cache: 'no-store', signal: timeout })
-    .then(async response => {
-      if (!response.ok) throw new Error('Cloudflare returned HTTP ' + response.status);
-      const payload = await response.json();
-      if (!Array.isArray(payload.listings)) throw new Error('Invalid listings response');
-      status.textContent = payload.listings.length + ' listings found in D1. Media not connected yet.';
-      if (!payload.listings.length) { list.textContent = 'No listings available.'; return; }
-      for (const entry of payload.listings) {
-        const card = document.createElement('article');
-        card.style.cssText = 'border-bottom:1px solid #ddd;padding:14px 0';
-        const title = document.createElement('strong');
-        title.textContent = String(entry.title || 'Untitled');
-        const details = document.createElement('p');
-        details.style.cssText = 'margin:4px 0;color:#555';
-        details.textContent = [entry.category, entry.city, entry.country, entry.price ? entry.price + ' €' : null].filter(Boolean).join(' · ');
-        const note = document.createElement('small');
-        note.style.cssText = 'color:#777';
-        note.textContent = 'Photos/videos: ' + (Array.isArray(entry.media) ? entry.media.length : 0);
-        card.append(title, details, note);
-        list.append(card);
+  const root = document.createElement('section');
+  root.setAttribute('aria-label','PEF Cloudflare beta feed');
+  root.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#101010;color:#fff;font:16px -apple-system,BlinkMacSystemFont,Arial,sans-serif';
+  const header = document.createElement('header');
+  header.style.cssText = 'position:absolute;top:0;left:0;right:0;z-index:2;padding:18px 22px;background:linear-gradient(#101010,transparent);display:flex;align-items:center;justify-content:space-between';
+  const back = document.createElement('a');back.href=location.pathname;back.textContent='← PEF';back.style.cssText='color:#fff;text-decoration:none;font-weight:700';
+  const brand = document.createElement('strong');brand.textContent='PEF Design · BETA';brand.style.cssText='font-size:14px';
+  header.append(back,brand);
+  const feed = document.createElement('div');
+  feed.style.cssText='height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain';
+  const status=document.createElement('div');
+  status.style.cssText='padding:120px 24px;text-align:center;color:#ccc';
+  status.textContent='Loading Cloudflare listings…';feed.append(status);
+  root.append(header,feed);document.body.append(root);
+  fetch(endpoint,{method:'GET',mode:'cors',credentials:'omit',cache:'no-store'})
+    .then(async response=>{if(!response.ok)throw new Error('HTTP '+response.status);return response.json()})
+    .then(data=>{
+      if(!Array.isArray(data.listings))throw new Error('Invalid response');
+      feed.replaceChildren();
+      if(!data.listings.length){status.textContent='No listings available';feed.append(status);return}
+      for(const entry of data.listings){
+        const card=document.createElement('article');
+        card.style.cssText='height:100dvh;min-height:100dvh;box-sizing:border-box;scroll-snap-align:start;position:relative;display:flex;flex-direction:column;justify-content:flex-end;padding:120px 24px 110px;background:radial-gradient(ellipse at 50% 38%,#282828,#101010 70%);';
+        const mark=document.createElement('div');mark.textContent='PEF';mark.style.cssText='position:absolute;top:35%;left:0;right:0;text-align:center;font-weight:900;font-size:clamp(90px,22vw,190px);letter-spacing:-.09em;color:#363636;pointer-events:none';
+        const label=document.createElement('div');label.textContent='PHOTO COMING SOON';label.style.cssText='position:absolute;top:54%;left:0;right:0;text-align:center;font-size:11px;letter-spacing:.2em;color:#777';
+        const title=document.createElement('h2');title.textContent=String(entry.title||'Untitled');title.style.cssText='position:relative;font-size:clamp(24px,5vw,38px);line-height:1.1;margin:0 0 12px;max-width:650px';
+        const price=document.createElement('div');price.textContent=(Number(entry.price)||0).toLocaleString('en-GB',{style:'currency',currency:'EUR',maximumFractionDigits:0});price.style.cssText='position:relative;font-size:23px;font-weight:700;margin-bottom:12px';
+        const meta=document.createElement('div');meta.textContent=[entry.category,entry.city,entry.country].filter(Boolean).join(' · ');meta.style.cssText='position:relative;color:#bbb;font-size:14px;margin-bottom:12px';
+        const description=document.createElement('p');description.textContent=String(entry.description||'');description.style.cssText='position:relative;color:#ddd;line-height:1.4;max-width:600px;margin:0 0 14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden';
+        const contact=document.createElement('a');
+        const digits=String(entry.whatsapp||'').replace(/\D/g,'');
+        if(digits){contact.href='https://wa.me/'+digits;contact.target='_blank';contact.rel='noopener noreferrer';contact.textContent='Contact seller ↗';contact.style.cssText='position:relative;display:inline-block;align-self:flex-start;padding:12px 20px;border:1px solid #fff;border-radius:30px;color:#fff;text-decoration:none;font-weight:600'}
+        card.append(mark,label,title,price,meta,description);if(digits)card.append(contact);feed.append(card);
       }
     })
-    .catch(error => { status.textContent = 'Unable to read Cloudflare: ' + error.message; });
+    .catch(error=>{status.textContent='Unable to load Cloudflare listings: '+error.message});
 })();
 </script>
 </body></html>
