@@ -1,0 +1,29 @@
+// PEF beta Worker. Deploy only after binding D1 as DB, R2 as MEDIA and setting ALLOWED_ORIGIN.
+// Requires cloudflare/schema-beta.sql. Never expose owner tokens to public listing API.
+const headers=env=>({'Content-Type':'application/json','Access-Control-Allow-Origin':env.ALLOWED_ORIGIN,'Access-Control-Allow-Headers':'Content-Type,Authorization','Access-Control-Allow-Methods':'GET,POST,PATCH,DELETE,OPTIONS','Vary':'Origin','Cache-Control':'no-store'});
+const reply=(env,obj,status=200)=>new Response(JSON.stringify(obj),{status,headers:headers(env)});
+const sha=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+const token=()=>{const a=new Uint8Array(32);crypto.getRandomValues(a);return [...a].map(x=>x.toString(16).padStart(2,'0')).join('')};
+const validate=x=>{const fields=['title','description','category','city','country','whatsapp'];const v={};for(const k of fields)v[k]=String(x[k]||'').trim();v.price=Number(x.price);if(!v.title||v.title.length>45||v.description.length>80||v.category.length>60||!v.city||v.city.length>60||!v.country||v.country.length>60||!/^\+?[0-9\s().-]{7,20}$/.test(v.whatsapp)||!Number.isFinite(v.price)||v.price<=0)return null;return v};
+const parse=async req=>{if(Number(req.headers.get('content-length')||0)>12000)throw Error('Payload too large');return req.json()};
+async function authorized(req,env,id){const t=req.headers.get('Authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];if(!t)return null;return env.DB.prepare("SELECT * FROM beta_listings WHERE id=? AND owner_token_hash=? AND status!='deleted'").bind(id,await sha(t)).first()}
+export default {async fetch(req,env){
+if(!env.DB||!env.MEDIA||!env.ALLOWED_ORIGIN)return new Response('Missing bindings',{status:503});
+const url=new URL(req.url),p=url.pathname,origin=req.headers.get('Origin');
+if(req.method==='OPTIONS')return origin===env.ALLOWED_ORIGIN?new Response(null,{status:204,headers:headers(env)}):reply(env,{error:'Forbidden'},403);
+if(origin&&origin!==env.ALLOWED_ORIGIN)return reply(env,{error:'Forbidden'},403);
+if(req.method!=='GET'&&origin!==env.ALLOWED_ORIGIN)return reply(env,{error:'Forbidden'},403);
+try{
+if(p==='/api/health'&&req.method==='GET')return reply(env,{ok:true});
+if(p==='/api/listings'&&req.method==='GET'){const result=await env.DB.prepare("SELECT id,title,description,category,price,city,country,whatsapp,media_json,created_at FROM beta_listings WHERE status='published' ORDER BY created_at DESC LIMIT 100").all();return reply(env,{listings:result.results.map(({media_json,...x})=>({...x,media:JSON.parse(media_json)}))})}
+if(p==='/api/listings'&&req.method==='POST'){const v=validate(await parse(req));if(!v)return reply(env,{error:'Invalid fields'},400);const id=crypto.randomUUID(),secret=token();await env.DB.prepare("INSERT INTO beta_listings(id,owner_token_hash,title,description,category,price,city,country,whatsapp,status) VALUES(?,?,?,?,?,?,?,?,?,'draft')").bind(id,await sha(secret),v.title,v.description,v.category,v.price,v.city,v.country,v.whatsapp).run();return reply(env,{id,ownerToken:secret},201)}
+const m=p.match(/^\/api\/listings\/([a-f0-9-]{36})(?:\/(publish|media))?$/);if(!m)return reply(env,{error:'Not found'},404);
+const [,id,action]=m,row=await authorized(req,env,id);if(!row)return reply(env,{error:'Not found'},404);
+if(!action&&req.method==='GET'){const {owner_token_hash,...safe}=row;return reply(env,{listing:{...safe,media:JSON.parse(row.media_json)}})}
+if(!action&&req.method==='PATCH'){const v=validate(await parse(req));if(!v)return reply(env,{error:'Invalid fields'},400);await env.DB.prepare("UPDATE beta_listings SET title=?,description=?,category=?,price=?,city=?,country=?,whatsapp=?,updated_at=datetime('now') WHERE id=?").bind(v.title,v.description,v.category,v.price,v.city,v.country,v.whatsapp,id).run();return reply(env,{ok:true})}
+if(!action&&req.method==='DELETE'){await env.DB.prepare("UPDATE beta_listings SET status='deleted',updated_at=datetime('now') WHERE id=?").bind(id).run();return reply(env,{ok:true})}
+if(action==='media'&&req.method==='POST'){const files=JSON.parse(row.media_json);if(files.length>=6)return reply(env,{error:'Maximum 5 photos and 1 video'},400);const type=req.headers.get('Content-Type')||'';const isPhoto=/^image\/(jpeg|png|webp)$/.test(type),isVideo=/^video\/(mp4|webm)$/.test(type);if(!isPhoto&&!isVideo)return reply(env,{error:'Unsupported media type'},415);if(isVideo&&files.some(f=>f.type==='video'))return reply(env,{error:'Only one video'},400);const bytes=await req.arrayBuffer();if(bytes.byteLength>(isPhoto?10:30)*1024*1024||!bytes.byteLength)return reply(env,{error:'Invalid media size'},413);const key='beta/'+id+'/'+crypto.randomUUID()+(type==='image/jpeg'?'.jpg':type==='image/png'?'.png':type==='image/webp'?'.webp':type==='video/mp4'?'.mp4':'.webm');await env.MEDIA.put(key,bytes,{httpMetadata:{contentType:type}});files.push({key,type:isPhoto?'photo':'video'});await env.DB.prepare("UPDATE beta_listings SET media_json=?,updated_at=datetime('now') WHERE id=?").bind(JSON.stringify(files),id).run();return reply(env,{ok:true,key})}
+if(action==='publish'&&req.method==='POST'){const media=JSON.parse(row.media_json),photos=media.filter(f=>f.type==='photo'),videos=media.filter(f=>f.type==='video');if(photos.length<2||photos.length>5||videos.length>1)return reply(env,{error:'2–5 photos required; 1 optional video'},400);await env.DB.prepare("UPDATE beta_listings SET status='published',updated_at=datetime('now') WHERE id=?").bind(id).run();return reply(env,{ok:true})}
+return reply(env,{error:'Method not allowed'},405)
+}catch(e){return reply(env,{error:'Request failed'},500)}
+}};
