@@ -1637,4 +1637,53 @@ function foldListings(){
 }
 document.addEventListener('DOMContentLoaded',()=>{const root=document.getElementById('pefAdminContent');if(!root)return;new MutationObserver(()=>{if(document.getElementById('profile')?.classList.contains('pef-admin-mode'))foldListings()}).observe(root,{childList:true,subtree:true});foldListings()});
 })();
-</script></body></html>
+</script>
+<!-- Cloudflare D1 staging verification: read-only, opt-in; production behavior unchanged. -->
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  if (params.get('cloudflare-preview') !== '1') return;
+  const endpoint = 'https://pef-design-api.galeriaparislisboa.workers.dev/api/text-listings';
+  const panel = document.createElement('section');
+  panel.setAttribute('role', 'region');
+  panel.setAttribute('aria-label', 'Cloudflare staging preview');
+  panel.style.cssText = 'position:fixed;inset:0;z-index:999999;overflow:auto;background:#fff;color:#111;padding:24px 18px 100px;font:15px/1.5 -apple-system,BlinkMacSystemFont,Arial,sans-serif';
+  const heading = document.createElement('h1');
+  heading.textContent = 'PEF — Cloudflare staging';
+  heading.style.cssText = 'font-size:24px;margin:0 0 8px';
+  const status = document.createElement('p');
+  status.textContent = 'Loading D1 listings…';
+  const close = document.createElement('a');
+  close.href = location.pathname;
+  close.textContent = '← Back to PEF';
+  close.style.cssText = 'display:inline-block;margin:8px 0 20px;color:#111';
+  const list = document.createElement('div');
+  panel.append(heading, status, close, list);
+  document.body.append(panel);
+  const timeout = AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined;
+  fetch(endpoint, { method: 'GET', mode: 'cors', credentials: 'omit', cache: 'no-store', signal: timeout })
+    .then(async response => {
+      if (!response.ok) throw new Error('Cloudflare returned HTTP ' + response.status);
+      const payload = await response.json();
+      if (!Array.isArray(payload.listings)) throw new Error('Invalid listings response');
+      status.textContent = payload.listings.length + ' listings found in D1. Media not connected yet.';
+      if (!payload.listings.length) { list.textContent = 'No listings available.'; return; }
+      for (const entry of payload.listings) {
+        const card = document.createElement('article');
+        card.style.cssText = 'border-bottom:1px solid #ddd;padding:14px 0';
+        const title = document.createElement('strong');
+        title.textContent = String(entry.title || 'Untitled');
+        const details = document.createElement('p');
+        details.style.cssText = 'margin:4px 0;color:#555';
+        details.textContent = [entry.category, entry.city, entry.country, entry.price ? entry.price + ' €' : null].filter(Boolean).join(' · ');
+        const note = document.createElement('small');
+        note.style.cssText = 'color:#777';
+        note.textContent = 'Photos/videos: ' + (Array.isArray(entry.media) ? entry.media.length : 0);
+        card.append(title, details, note);
+        list.append(card);
+      }
+    })
+    .catch(error => { status.textContent = 'Unable to read Cloudflare: ' + error.message; });
+})();
+</script>
+</body></html>
