@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pef-design-api",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2026-11-21",
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pef-design-db",
+      "database_id": "fe5fe51b-da9a-4c71-a8b0-8184f652318b"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "pef-design-media"
+    }
+  ]
+}
