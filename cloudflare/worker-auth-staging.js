@@ -63,7 +63,7 @@ export default {
    const fields=[],values=[];
    for(const key of keys){
     let value=input[key];
-    if(key==='price'){if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>100000000)return out({error:'Invalid price'},400);}
+    if(key==='price'){if(typeof value!=='string'||!/^\\d+(?:\\.\\d{1,2})?$/.test(value)||Number(value)>100000000)return out({error:'Invalid price'},400);}
     else {if(typeof value!=='string')return out({error:'Invalid '+key},400);value=value.trim();
      if(!value||value.length>(key==='description'?2000:key==='title'?120:160))return out({error:'Invalid '+key},400);
      if(key==='listing_status'&&!['available','sold','reserved'].includes(value))return out({error:'Invalid status'},400);
