@@ -64,7 +64,7 @@ export default {
    for(const key of keys){
     let value=input[key];
     if(key==='price'){
-     if(!/^\\d+(\\.\\d{1,2})?$/.test(String(value).trim()))return out({error:'Invalid price'},400);
+     if(!/^[0-9]+([.][0-9]{1,2})?$/.test(String(value).trim()))return out({error:'Invalid price'},400);
      value=String(value).trim();
     }else{
      if(typeof value!=='string')return out({error:'Invalid '+key},400);
@@ -95,6 +95,7 @@ export default {
    if(!user)return out({error:'Unauthorized'},401);
    if(!env.DB||!env.MEDIA)return out({error:'Storage unavailable'},503);
    const id=decodeURIComponent((uploadMatch||mediaMatch)[1]);
+   if(!/^[a-zA-Z0-9_-]{1,100}$/.test(id))return out({error:'Invalid listing ID'},400);
    const account=await env.DB.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').bind(user.email.toLowerCase()).first();
    if(!account)return out({error:'Account not found'},403);
    const existing=await env.DB.prepare('SELECT id,seller_id,photos,video_url FROM pef_objects WHERE id=? LIMIT 1').bind(id).first();
@@ -121,7 +122,7 @@ export default {
    if(photos.some(p=>typeof p!=='string'||!p.startsWith('https://'))||new Set(photos).size!==photos.length)return out({error:'Invalid photo URLs'},400);
    if(video!==null&&(typeof video!=='string'||!video.startsWith('https://')))return out({error:'Invalid video URL'},400);
    // New R2 URLs must belong to this listing; existing URLs can be retained.
-   const oldPhotos=(()=>{try{return JSON.parse(existing.photos||'[]')}catch{return []}})();
+   const oldPhotos=(()=>{try{const p=JSON.parse(existing.photos||'[]');return Array.isArray(p)?p:[]}catch{return []}})();
    const allowedOld=new Set([...oldPhotos,existing.video_url].filter(Boolean));
    const ownPrefix=new URL('/media/listings/'+id+'/',url).toString();
    if([...photos,...(video?[video]:[])].some(p=>!allowedOld.has(p)&&!p.startsWith(ownPrefix)))return out({error:'Media must belong to this listing'},403);
