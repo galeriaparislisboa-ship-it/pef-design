@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PEF Design — Secure sign in (preview)</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;color:#181818;background:#fff}
+*{box-sizing:border-box}body{margin:0;min-height:100svh;display:grid;place-items:center;padding:24px}
+main{width:min(100%,380px)}h1{font-size:32px;letter-spacing:-1.5px;margin:0 0 8px}p{color:#777;font-size:14px;line-height:1.5;margin:0 0 28px}
+label{display:block;font-size:12px;font-weight:650;letter-spacing:.04em;margin:20px 0 8px}
+input{width:100%;border:1px solid #ddd;border-radius:13px;padding:15px;font:inherit;font-size:16px}
+button{width:100%;background:#e41713;border:0;color:white;border-radius:14px;font:inherit;font-weight:650;padding:16px;margin-top:24px;cursor:pointer}
+button:disabled{opacity:.55}#status{margin-top:16px;min-height:22px}small{display:block;color:#888;margin-top:30px}
+</style><main><h1>PEF Design</h1><p>Secure gallery access — no email code required.</p>
+<form id="login"><label for="email">EMAIL</label><input id="email" type="email" autocomplete="username" required>
+<label for="password">PASSWORD</label><input id="password" type="password" autocomplete="current-password" required minlength="12">
+<button id="submit" type="submit">Sign in</button></form><p id="status" role="status" aria-live="polite"></p>
+<small>Preview only. Publishing is not yet enabled. This page does not bypass authorization.</small></main>
+<script>
+const API='https://pef-design-api.galeriaparislisboa.workers.dev';
+document.getElementById('login').addEventListener('submit',async event=>{
+ event.preventDefault();const btn=document.getElementById('submit'),status=document.getElementById('status');
+ btn.disabled=true;status.textContent='Connecting…';
+ try{
+  const response=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value})});
+  const data=await response.json();
+  if(!response.ok)throw new Error(response.status===404||response.status===405?'Cloudflare authentication has not been deployed yet.':data.error||'Sign in failed');
+  sessionStorage.setItem('pef_cloudflare_session',data.token);
+  document.getElementById('password').value='';
+  status.textContent='Connected as '+data.role+'. Publishing integration is still pending.';
+ }catch(e){status.textContent=e.message}finally{btn.disabled=false}
+});
+</script></html>
