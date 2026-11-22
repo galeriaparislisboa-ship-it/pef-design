@@ -30,7 +30,18 @@ export default {
   if(path==='/api/auth/me'&&method==='GET'){const user=await authorize(request,env);return user?out({role:user.role,email:user.email}):out({error:'Unauthorized'},401);}
   if(path==='/api/text-listings'&&method==='GET'){
    if(!env.DB)return out({error:'Database unavailable'},503);
-   try{const result=await env.DB.prepare('SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,created_at FROM pef_objects WHERE COALESCE(is_hidden,0)=0 ORDER BY created_at DESC LIMIT 100').all();return out({listings:result.results.map(x=>({...x,media:[]})),count:result.results.length});}
+   try{
+    const result=await env.DB.prepare('SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,created_at,photos,video_url,media_order FROM pef_objects WHERE COALESCE(is_hidden,0)=0 ORDER BY created_at DESC LIMIT 100').all();
+    const parseArray=(value)=>{if(Array.isArray(value))return value;if(typeof value!=='string')return [];try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[]}catch{return []}};
+    const listings=result.results.map(row=>{
+     const photos=parseArray(row.photos).filter(url=>typeof url==='string'&&/^https:\/\//.test(url));
+     const video=typeof row.video_url==='string'&&(/\/video\/upload\//.test(row.video_url)||/\.(mp4|webm|mov)(\?|$)/i.test(row.video_url))?row.video_url:null;
+     const media=photos.map((url,index)=>({type:'photo',url,index}));
+     if(video)media.splice(Math.min(1,media.length),0,{type:'video',url:video});
+     return {...row,photos,video_url:video,media_order:parseArray(row.media_order),media};
+    });
+    return out({listings,count:listings.length});
+   }
    catch{return out({error:'Unable to load listings'},500);}
   }
   // Protected write endpoints intentionally remain disabled until schema and media mappings are verified.
