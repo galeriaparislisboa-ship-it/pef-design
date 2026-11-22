@@ -25,7 +25,9 @@ document.getElementById('login').addEventListener('submit',async event=>{
   if(!response.ok)throw new Error(response.status===404||response.status===405?'Cloudflare authentication has not been deployed yet.':data.error||'Sign in failed');
   sessionStorage.setItem('pef_cloudflare_session',data.token);
   document.getElementById('password').value='';
-  status.textContent='Connected as '+data.role+'. Publishing integration is still pending.';
+  status.textContent='Connected as '+data.role+'. Opening your gallery preview…';
+  const accountId={'galeriaparislisboa@gmail.com':'f81528f3-3c3c-4590-9ee9-543f950b6884','ndondina@muchimuchi.fr':'a25a6c44-b649-44ee-aa89-30b2f4832268'}[data.email.toLowerCase()];
+  if(accountId){window.location.assign('/gallery-preview.html')}else{status.textContent='Connected. Gallery workspace is not yet enabled for this account.';}
  }catch(e){status.textContent=e.message}finally{btn.disabled=false}
 });
 </script></html>
