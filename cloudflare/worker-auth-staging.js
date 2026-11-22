@@ -44,6 +44,37 @@ export default {
    }
    catch{return out({error:'Unable to load listings'},500);}
   }
+  // Gallery editing: deliberately limited to metadata; media uploads and publishing remain disabled.
+  if(path.match(/^\\/api\\/listings\\/[a-zA-Z0-9-]+$/)&&method==='PATCH'){
+   const user=await authorize(request,env);
+   if(!user)return out({error:'Unauthorized'},401);
+   if(!env.DB)return out({error:'Database unavailable'},503);
+   const account=await env.DB.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').bind(user.email.toLowerCase()).first();
+   if(!account)return out({error:'Account not found'},403);
+   const id=decodeURIComponent(path.split('/').pop());
+   const existing=await env.DB.prepare('SELECT id,seller_id FROM pef_objects WHERE id=? LIMIT 1').bind(id).first();
+   if(!existing)return out({error:'Listing not found'},404);
+   if(user.role!=='admin'&&existing.seller_id!==account.id)return out({error:'Forbidden'},403);
+   const input=await request.json().catch(()=>null);
+   if(!input||typeof input!=='object'||Array.isArray(input))return out({error:'Invalid JSON'},400);
+   const allowed=['title','description','price','city','country','category','whatsapp','listing_status'];
+   const keys=Object.keys(input);
+   if(!keys.length||keys.some(k=>!allowed.includes(k)))return out({error:'Unsupported field'},400);
+   const fields=[],values=[];
+   for(const key of keys){
+    let value=input[key];
+    if(key==='price'){if(typeof value!=='string'||!/^\\d+(?:\\.\\d{1,2})?$/.test(value)||Number(value)>100000000)return out({error:'Invalid price'},400);}
+    else {if(typeof value!=='string')return out({error:'Invalid '+key},400);value=value.trim();
+     if(!value||value.length>(key==='description'?2000:key==='title'?120:160))return out({error:'Invalid '+key},400);
+     if(key==='listing_status'&&!['available','sold','reserved'].includes(value))return out({error:'Invalid status'},400);
+    }
+    fields.push(key+'=?');values.push(value);
+   }
+   try{
+    await env.DB.prepare('UPDATE pef_objects SET '+fields.join(',')+' WHERE id=? AND seller_id=?').bind(...values,id,existing.seller_id).run();
+    return out({ok:true,id,updated:keys});
+   }catch{return out({error:'Unable to update listing'},500);}
+  }
   // Protected write endpoints intentionally remain disabled until schema and media mappings are verified.
   if(path.startsWith('/api/admin')||path.startsWith('/api/listings')||path.startsWith('/api/media')){
    const user=await authorize(request,env);if(!user)return out({error:'Unauthorized'},401);
