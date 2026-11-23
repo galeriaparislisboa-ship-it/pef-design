@@ -1005,11 +1005,11 @@ async function pefLoadOwnerInstagram(){
  }catch(e){note.textContent='Instagram unavailable: '+e.message}
 }
 async function pefLoadPublicInstagram(sellerId){
- const root=document.getElementById('pefPublicSellerContent');if(!root||!sb)return;
- const {data,error}=await sb.from('pef_seller_profiles').select('instagram_username').eq('user_id',sellerId).maybeSingle();
+ const root=document.getElementById('pefPublicSellerContent');if(!root)return;
+ // Instagram connection belongs to this gallery only; do not depend on restricted Supabase.
+ if(String(sellerId)!=='f81528f3-3c3c-4590-9ee9-543f950b6884')return;
  if(root.dataset.sellerId!==String(sellerId))return;
- const username=(data?.instagram_username||'').replace(/^@/,'').toLowerCase();
- if(username!=='galerie_paris_lisbon')return; // Only this account has granted API access; never display its posts on other sellers.
+ const username='galerie_paris_lisbon';
  const section=document.createElement('section');section.className='pef-instagram-gallery';section.dataset.maxPosts='12';section.setAttribute('aria-label','Seller Instagram gallery');
  const title=document.createElement('h2');title.textContent='Instagram';
  const note=document.createElement('p');note.textContent='Loading Instagram posts…';note.className='muted';
