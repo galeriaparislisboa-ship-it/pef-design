@@ -1431,7 +1431,7 @@ async function pefGalleryRefresh(){
     if(error||!ok)throw Error(error?.message||'Photos save failed');
     if(videoUrl!==row.video_url||videoRemoved){const {data:videoOk,error:videoError}=await sb.rpc('pef_gallery_set_video',{p_id:row.id,p_video_url:videoUrl});if(videoError||!videoOk)throw Error(videoError?.message||'Video save failed')}
     photos=urls;video=videoUrl;row.video_url=videoUrl;currentMediaSnapshot=JSON.stringify({photos,video});pendingPhotos.length=0;videoInput.value='';videoRemoved=false;draw();status.textContent='✓ Media saved';await loadRemote();
-   }catch(e){status.textContent=e.message||'Unable to save'}finally{save.disabled=false;save.textContent='Save media'}
+   }catch(e){const message=e?.message||'Unable to save';const authFailure=/unauthorized|jwt|permission denied|not authenticated|401|403/i.test(message);status.textContent=authFailure?'Session not authorized to save media. Sign in to your gallery account again, then retry. Details: '+message:'Unable to save media: '+message;status.setAttribute('role','alert');console.error('[PEF gallery] Save media failed',e)}finally{save.disabled=false;save.textContent='Save media'}
   };
   const addPhotos=document.createElement('button');addPhotos.type='button';addPhotos.className='pef-ios-add-photos';addPhotos.innerHTML="<svg viewBox=\"0 0 24 24\" width=\"17\" height=\"17\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg>"+' Add photos';addPhotos.onclick=()=>input.click();
   const actions=document.createElement('div');actions.className='pef-ios-media-actions';actions.append(videoToggle,galleryVideoSave,removeVideo);
