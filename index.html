@@ -1265,7 +1265,45 @@ document.getElementById('feed')?.addEventListener('scroll',pefCheckInfiniteFeed,
  feed.addEventListener('keydown',e=>{if((e.key==='ArrowDown'||e.key==='PageDown')&&ready()){e.preventDefault();loop()}});
 })();
 
-async function loadRemote(loadMore=false){if(!sb||pefRemoteRefreshBusy||loadMore&&!pefRemoteHasMore)return;pefRemoteRefreshBusy=true;try{const from=loadMore?pefRemoteLoaded:0;const {data,error}=await sb.from('pef_objects').select('*').eq('is_hidden',false).order('created_at',{ascending:false}).order('id',{ascending:false}).range(from,from+PEF_FEED_PAGE_SIZE-1);if(error){console.warn('Feed Supabase:',error.message);return}const {data:badgeRows,badgeError}=await sb.rpc('pef_public_approved_badges');if(!badgeError){const badges=Object.fromEntries((badgeRows||[]).map(b=>[b.seller_id,b.badge]));const names=Object.fromEntries((badgeRows||[]).map(b=>[b.seller_id,b.display_name||'']));if(JSON.stringify(badges)!==JSON.stringify(pefSellerBadges)||JSON.stringify(names)!==JSON.stringify(pefSellerNames)){pefSellerBadges=badges;pefSellerNames={...{'f81528f3-3c3c-4590-9ee9-543f950b6884':'Galerie Paris–Lisboa','34b5a0a1-83f3-4048-aca4-167b9edabc4f':'54 Dunkerque'},...names};render()}}let changed=false;const remoteIds=new Set((data||[]).map(x=>x.id));if(!loadMore&&pefRemoteLoaded<=PEF_FEED_PAGE_SIZE){for(let i=items.length-1;i>=0;i--){if(items[i].remote&&!remoteIds.has(items[i].id)){items.splice(i,1);changed=true}}}for(const row of data||[]){const index=items.findIndex(x=>x.id===row.id);if(index<0){items.push(fromRemote(row));changed=true}else{const old=items[index];if(old.url!==(row.photos?.length?'':row.video_url)||JSON.stringify(old.photos||[])!==JSON.stringify(row.photos||[])||old.likes!==row.likes||old.views!==row.views||old.name!==row.title||old.listingStatus!==(row.listing_status||"available")||old.contacts!==(row.whatsapp_clicks||0)||Number(old.price)!==Number(row.price)){items[index]={...old,...fromRemote(row)};changed=true}}}pefRemoteLoaded=loadMore?pefRemoteLoaded+(data||[]).length:Math.max(pefRemoteLoaded,(data||[]).length);pefRemoteHasMore=(data||[]).length===PEF_FEED_PAGE_SIZE;if(changed){const feed=document.getElementById('feed');const currentNode=feed?.children?.length?feed.children[Math.min(feed.children.length-1,Math.round(feed.scrollTop/Math.max(feed.clientHeight,1)))]:null;const anchorId=currentNode?.dataset.pefId;render();if(feed&&anchorId)requestAnimationFrame(()=>{const match=Array.from(feed.children).find(el=>el.dataset.pefId===anchorId);if(match)feed.scrollTop=match.offsetTop})}if(loadMore)requestAnimationFrame(pefCheckInfiniteFeed);if(document.getElementById('profile')&&!document.getElementById('profile').classList.contains('hidden'))stats();pefOpenSellerDeepLink();pefOpenListingDeepLink()}finally{pefRemoteRefreshBusy=false}}
+// Cloudflare D1 public feed: Supabase is no longer the source of public listings.
+const PEF_PUBLIC_FEED_API='https://pef-design-api.galeriaparislisboa.workers.dev/api/text-listings';
+async function pefFetchCloudflareListings(){
+ const response=await fetch(PEF_PUBLIC_FEED_API,{headers:{Accept:'application/json'},cache:'no-store'});
+ if(!response.ok)throw Error('Cloudflare feed HTTP '+response.status);
+ const payload=await response.json();
+ const rows=Array.isArray(payload)?payload:
+  [payload?.listings,payload?.items,payload?.data,payload?.results,payload?.objects].find(Array.isArray);
+ if(!rows)throw Error('Unexpected Cloudflare feed response');
+ return rows.map(raw=>{
+  const x=raw?.listing||raw?.object||raw;
+  const media=Array.isArray(x.media)?x.media:[];
+  const photos=Array.isArray(x.photos)?x.photos:media.filter(m=>m.type==='image'||m.media_type==='image').map(m=>m.url||m.public_url).filter(Boolean);
+  const video=x.video_url||media.find(m=>m.type==='video'||m.media_type==='video')?.url||'';
+  return {...x,id:x.id||x.listing_id,seller_id:x.seller_id||x.sellerId||x.user_id,title:x.title||x.name||'Untitled',photos:photos.map(p=>typeof p==='string'?p:p.url||p.public_url).filter(Boolean),video_url:video,whatsapp:x.whatsapp||x.phone||'',listing_status:x.listing_status||x.status||'available',created_at:x.created_at||x.createdAt||'',likes:x.likes||0,views:x.views||0};
+ }).filter(x=>x.id&&x.title);
+}
+async function pefLoadCloudflareFeed(loadMore=false){
+ if(pefRemoteRefreshBusy)return;
+ pefRemoteRefreshBusy=true;
+ try{
+  const rows=await pefFetchCloudflareListings();
+  const visible=rows.filter(x=>x.is_hidden!==true&&x.is_hidden!==1&&x.is_hidden!=='1');
+  for(const row of visible){
+   if(row.seller_id&&row.display_name)pefSellerNames[row.seller_id]=row.display_name;
+   if(row.seller_id&&row.seller_name)pefSellerNames[row.seller_id]=row.seller_name;
+  }
+  const remoteIds=new Set(visible.map(x=>String(x.id)));
+  for(let i=items.length-1;i>=0;i--)if(items[i].remote&&!remoteIds.has(String(items[i].id)))items.splice(i,1);
+  for(const row of visible){
+   const next=fromRemote(row),index=items.findIndex(x=>String(x.id)===String(row.id));
+   if(index<0)items.push(next);else items[index]={...items[index],...next};
+  }
+  pefRemoteLoaded=visible.length;pefRemoteHasMore=false;
+  render();pefOpenSellerDeepLink();pefOpenListingDeepLink();
+ }catch(error){console.error('Cloudflare feed:',error);throw error}
+ finally{pefRemoteRefreshBusy=false}
+}
+async function loadRemote(loadMore=false){return pefLoadCloudflareFeed(loadMore);if(!sb||pefRemoteRefreshBusy||loadMore&&!pefRemoteHasMore)return;pefRemoteRefreshBusy=true;try{const from=loadMore?pefRemoteLoaded:0;const {data,error}=await sb.from('pef_objects').select('*').eq('is_hidden',false).order('created_at',{ascending:false}).order('id',{ascending:false}).range(from,from+PEF_FEED_PAGE_SIZE-1);if(error){console.warn('Feed Supabase:',error.message);return}const {data:badgeRows,badgeError}=await sb.rpc('pef_public_approved_badges');if(!badgeError){const badges=Object.fromEntries((badgeRows||[]).map(b=>[b.seller_id,b.badge]));const names=Object.fromEntries((badgeRows||[]).map(b=>[b.seller_id,b.display_name||'']));if(JSON.stringify(badges)!==JSON.stringify(pefSellerBadges)||JSON.stringify(names)!==JSON.stringify(pefSellerNames)){pefSellerBadges=badges;pefSellerNames={...{'f81528f3-3c3c-4590-9ee9-543f950b6884':'Galerie Paris–Lisboa','34b5a0a1-83f3-4048-aca4-167b9edabc4f':'54 Dunkerque'},...names};render()}}let changed=false;const remoteIds=new Set((data||[]).map(x=>x.id));if(!loadMore&&pefRemoteLoaded<=PEF_FEED_PAGE_SIZE){for(let i=items.length-1;i>=0;i--){if(items[i].remote&&!remoteIds.has(items[i].id)){items.splice(i,1);changed=true}}}for(const row of data||[]){const index=items.findIndex(x=>x.id===row.id);if(index<0){items.push(fromRemote(row));changed=true}else{const old=items[index];if(old.url!==(row.photos?.length?'':row.video_url)||JSON.stringify(old.photos||[])!==JSON.stringify(row.photos||[])||old.likes!==row.likes||old.views!==row.views||old.name!==row.title||old.listingStatus!==(row.listing_status||"available")||old.contacts!==(row.whatsapp_clicks||0)||Number(old.price)!==Number(row.price)){items[index]={...old,...fromRemote(row)};changed=true}}}pefRemoteLoaded=loadMore?pefRemoteLoaded+(data||[]).length:Math.max(pefRemoteLoaded,(data||[]).length);pefRemoteHasMore=(data||[]).length===PEF_FEED_PAGE_SIZE;if(changed){const feed=document.getElementById('feed');const currentNode=feed?.children?.length?feed.children[Math.min(feed.children.length-1,Math.round(feed.scrollTop/Math.max(feed.clientHeight,1)))]:null;const anchorId=currentNode?.dataset.pefId;render();if(feed&&anchorId)requestAnimationFrame(()=>{const match=Array.from(feed.children).find(el=>el.dataset.pefId===anchorId);if(match)feed.scrollTop=match.offsetTop})}if(loadMore)requestAnimationFrame(pefCheckInfiniteFeed);if(document.getElementById('profile')&&!document.getElementById('profile').classList.contains('hidden'))stats();pefOpenSellerDeepLink();pefOpenListingDeepLink()}finally{pefRemoteRefreshBusy=false}}
 async function refreshPEFLive(){if(document.hidden)return;await loadRemote();if(!document.getElementById('profile').classList.contains('hidden'))await loadPEFQueue()}
 setInterval(refreshPEFLive,60000);
 (function enableProfileScrollRefresh(){
