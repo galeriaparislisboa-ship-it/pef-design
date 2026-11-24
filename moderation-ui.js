@@ -58,17 +58,27 @@
   const formatDate=value=>value?new Date(value.replace(' ','T')+(value.includes('T')?'':'Z')).toLocaleString('fr-FR'):'';
   const name=id=>{const account=data.accounts.find(row=>row.id===id);return account?.display_name||account?.email||id||'Compte inconnu'};
   const tabButtons=Object.fromEntries(Object.entries(titles).map(([key,title])=>{
-   const tab=button(title,()=>{if(busy||!data)return;active=key;search.value='';renderControls();renderList()});
+   const tab=button(title,()=>{
+    active=key;
+    search.value='';
+    if(data){renderControls();renderList()}
+    else refresh();
+   });
    nav.append(tab);return [key,tab];
   }));
   async function refresh(){
    if(busy)return;
    busy=true;refreshButton.disabled=true;feedback.textContent='Chargement…';
    try{data=await request(path,token);search.disabled=false;renderControls();renderList();feedback.textContent=''}
-   catch(error){feedback.textContent=error.message}
+   catch(error){
+    feedback.textContent=error.message==='Unauthorized'
+     ? 'Session expirée. Déconnectez-vous puis reconnectez-vous.'
+     : 'Impossible de charger l’administration. Cliquez sur Actualiser pour réessayer.';
+   }
    finally{busy=false;refreshButton.disabled=false}
   }
   const refreshButton=button('Actualiser',refresh);
+  controls.append(refreshButton);
   host.append(nav,controls,feedback,list);
   function renderControls(){
    for(const [key,tab] of Object.entries(tabButtons)){
