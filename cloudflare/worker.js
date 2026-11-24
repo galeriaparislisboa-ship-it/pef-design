@@ -1,3 +1,4 @@
+import {newsletters} from "./newsletters.mjs";
 import {initializeModeration, moderation, visibleListing} from "./moderation.mjs";
 import {googleAuth} from "./auth-google.js";
 import {issueCode,consumeCode} from "./auth-email-code.mjs";
@@ -69,6 +70,10 @@ export default {
    return out({token:payload+'.'+await sign(env.SESSION_SECRET,payload),role,email,expires_in:28800});
   }
   if(path==='/api/auth/me'&&method==='GET'){const user=await authorize(request,env);return user?out({role:user.role,email:user.email,userId:user.userId}):out({error:'Unauthorized'},401);}
+  if(path==='/api/gallery/newsletters'||path.startsWith('/api/gallery/newsletters/')){
+   const user=path.endsWith('/public')?null:await authorize(request,env);
+   return newsletters(request,env,user,out);
+  }
   if(path==='/api/gallery/newsletter-contacts'){
    const user=await authorize(request,env);
    if(user?.role!=='gallery'||user.email!=='galeriaparislisboa@gmail.com')return out({error:'Forbidden'},403);
