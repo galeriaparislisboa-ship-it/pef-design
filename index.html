@@ -826,9 +826,12 @@ transform:none!important;
 .pef-newsletter button[aria-pressed=true]{background:#555;color:#fff}.pef-newsletter button:disabled{opacity:.45;cursor:default}
 .pef-newsletter [data-pieces]{max-height:290px;overflow:auto}
 .pef-newsletter-piece{border-bottom:1px solid #ddd;padding:4px 0}
-.pef-newsletter-piece label{display:flex;align-items:center;margin:0;flex:1;min-width:0;overflow-wrap:anywhere}
+.pef-newsletter-piece label{display:grid;grid-template-columns:20px 42px minmax(0,1fr);align-items:center;gap:8px;margin:0;flex:1 1 0;min-width:0}
+.pef-newsletter-piece-title{min-width:0;overflow-wrap:anywhere}
+.pef-newsletter-piece>button{flex:0 0 44px;min-height:44px;padding:0}
 .pef-newsletter-piece img{width:42px;height:42px;object-fit:cover;border-radius:5px}
-.pef-newsletter input[type=checkbox]{accent-color:#555}
+.pef-newsletter input[type=checkbox]{inline-size:20px!important;block-size:20px!important;min-width:0!important;min-height:0!important;flex:0 0 20px;margin:0;padding:0;accent-color:#555}
+.pef-newsletter :is(button,input,select,textarea):focus-visible{outline:2px solid #666;outline-offset:2px}
 .pef-newsletter iframe{display:block;width:100%;height:54vh;border:1px solid #ccc;border-radius:10px;box-sizing:border-box;background:white;margin:8px auto}
 .pef-newsletter iframe.pef-newsletter-mobile{max-width:375px}
 .pef-newsletter-actions{justify-content:flex-end;flex-wrap:wrap}
@@ -849,7 +852,16 @@ transform:none!important;
 .pef-newsletter-public{max-width:720px}
 .pef-newsletter-public iframe{height:70dvh}
 .pef-newsletter-public iframe[hidden]{display:none}
-@media(max-width:700px){.pef-newsletter-layout{grid-template-columns:1fr}}
+@media(max-width:700px){
+ .pef-newsletter{width:calc(100% - 20px);max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px);padding:14px;overscroll-behavior:contain}
+ .pef-newsletter-layout{grid-template-columns:minmax(0,1fr);gap:14px}
+ .pef-newsletter header{gap:8px}
+ .pef-newsletter .pef-newsletter-heading{min-width:0;gap:8px}
+ .pef-newsletter .pef-newsletter-heading img{width:32px}
+ .pef-newsletter .pef-newsletter-heading h1{font-size:17px;line-height:1.2}
+ .pef-newsletter [data-close]{flex:none;padding-inline:10px}
+ .pef-newsletter :is(input:not([type=checkbox]),textarea,select){font-size:16px}
+}
 </style><style>
 .top .logo{width:58px!important;flex:0 0 58px!important;transform:none!important;overflow:visible}
 .top .logo img,.pef-auth-logo,.pef-dashboard-logo,.pef-newsletter-heading img{display:block;height:auto;object-fit:contain}
@@ -2592,7 +2604,8 @@ function openPefNewsletter(token){
    const label=document.createElement('label'),check=document.createElement('input'),image=document.createElement('img');
    check.type='checkbox';check.checked=selected.includes(piece);check.dataset.piece=piece.id;
    image.src=piece.photos[0];image.alt='';image.loading='lazy';
-   label.append(check,image,document.createTextNode(piece.title));row.append(label);
+   const title=document.createElement('span');title.className='pef-newsletter-piece-title';title.textContent=piece.title;
+   label.append(check,image,title);row.append(label);
    check.onchange=()=>{
     selected=check.checked?[...selected,piece]:selected.filter(x=>x!==piece);
     renderPieces();[...list.querySelectorAll('input')].find(x=>x.dataset.piece===piece.id)?.focus();render();
