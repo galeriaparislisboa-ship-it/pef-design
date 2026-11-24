@@ -823,7 +823,7 @@ transform:none!important;
 .pef-newsletter h1{font-size:21px}.pef-newsletter h2{font-size:15px}
 .pef-newsletter-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.45fr);gap:18px}
 .pef-newsletter label{display:grid;gap:5px;margin-bottom:10px}
-.pef-newsletter :is(input:not([type=checkbox]),textarea){width:100%;box-sizing:border-box;padding:9px;border:1px solid #aaa;border-radius:9px;background:#fff;color:#222;font:inherit}
+.pef-newsletter :is(input:not([type=checkbox]),textarea,select){width:100%;box-sizing:border-box;padding:9px;border:1px solid #aaa;border-radius:9px;background:#fff;color:#222;font:inherit}
 .pef-newsletter button{min-height:38px;border:1px solid #777;border-radius:999px;background:#fff;color:#222;padding:7px 12px;font:inherit;cursor:pointer}
 .pef-newsletter button[aria-pressed=true]{background:#555;color:#fff}.pef-newsletter button:disabled{opacity:.45;cursor:default}
 .pef-newsletter [data-pieces]{max-height:290px;overflow:auto}
@@ -835,6 +835,8 @@ transform:none!important;
 .pef-newsletter iframe.pef-newsletter-mobile{max-width:375px}
 .pef-newsletter-actions{justify-content:flex-end;flex-wrap:wrap}
 .pef-newsletter [role=status]{margin-top:8px}
+.pef-newsletter [data-contacts]{margin-top:16px;padding-top:12px;border-top:1px solid #ccc}
+.pef-newsletter [data-contacts] .pef-newsletter-actions{justify-content:flex-start}
 @media(max-width:700px){.pef-newsletter-layout{grid-template-columns:1fr}}
 </style></head><body><div class="app"><header class="top"><div class="top-left"><button onclick="show('feed')" aria-label="Back to feed">←</button><span class="top-tagline">Post it. That's it.</span></div><span class="logo" aria-label="PEF Design — Beta"><img src="/pef-logo.svg" alt="PEF Design" style="display:block;width:100%;height:auto"><span class="pef-beta-label">BETA VERSION</span></span></header>
 <div id="categories" class="categories"></div><main id="feed" class="feed"></main><section id="invitation" class="screen hidden"><div class="invite-wrap"><h1>PEF Design <span style="font-weight:400;font-size:13px">BETA</span></h1><div class="invite-copy"><p>Hi! How are you? 👋</p><p>I'm launching <strong>PEF Design</strong>, a new app with one simple promise: <strong>list an object with a video in under a minute!</strong></p><p>Running my gallery, I know how time-consuming listings can be. I wanted to make the process simpler.</p><p>The app is still in beta and has not launched publicly. You can test it by posting one or more objects.</p><p>I'll moderate listings and welcome your feedback, suggestions and ideas to improve the app.</p><p>See you soon!<br><strong>Nicolas — PEF Design</strong></p></div><div class="invite-triptych" id="inviteTriptych" aria-label="Three screenshots from PEF Design"><img class="invite-triptych-image" src="https://utamrlmtpqtlcuptwywb.supabase.co/storage/v1/object/public/pef-images/pef_triptyque_nouveau_500px.png" alt="Three screenshots of the PEF Design app" onerror="this.style.display='none';renderInvitationFallback()"></div><p class="invite-note">Discover real objects from the PEF Design feed.</p><button type="button" class="invite-cta" onclick="copyInvitationEmail()">Copy email with images →</button><p id="inviteCopyStatus" class="invite-note" role="status">Paste into Apple Mail with ⌘V, then choose your recipient.</p><button type="button" class="invite-cta" onclick="location.hash='';show('create')">Post your object in under a minute →</button><button type="button" class="invite-secondary" onclick="location.hash='';show('feed')">Explore PEF Design</button></div></section><section id="create" class="screen hidden"><h1>Post an item</h1><p class="muted">Start with 2–5 photos. Add an optional 10-second video.</p><label class="upload-tile" for="video"><span class="upload-icon">＋</span><strong>Add an optional video</strong><span class="muted" id="uploadFilename">Choose from your photo library</span></label><input id="video" class="visually-hidden" type="file" accept="video/*" onchange="prepareTrimPreview()"><button type="button" onclick="document.getElementById('pefRecentVideo').click()" style="display:block;margin:9px auto 15px;padding:9px 16px;border:1px solid #666;border-radius:24px;background:transparent;color:inherit;font:inherit;font-size:13px">Browse all recent photos & videos</button><input id="pefRecentVideo" class="visually-hidden" type="file" accept="image/*,video/*" onchange="pefChooseRecentVideo(this)"><div class="pef-photo-picker"><div class="pef-photo-picker-title">Photos <span>2 required · maximum 5</span></div><div class="pef-photo-picker-actions"><button type="button" onclick="document.getElementById('pefCameraInput').click()" aria-label="Take a photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h4l2-2h4l2 2h4v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Camera</span></button><button type="button" onclick="document.getElementById('pefPhotos').click()" aria-label="Choose photos from library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m4 18 6-6 4 4 3-3 4 4"/></svg><span>Library</span></button></div></div><input id="pefPhotos" class="visually-hidden" type="file" accept="image/*" multiple onchange="pefPreviewPhotos()"><input id="pefCameraInput" class="visually-hidden" type="file" accept="image/*" capture="environment" onchange="pefAddCameraPhoto(this)"><div id="pefPhotoPreview" class="pef-photo-preview"></div><div id="trimEditor" class="hidden" style="padding:12px 0"><video id="trimPreview" playsinline controls preload="metadata" style="width:100%;max-height:280px;background:#111"></video><div class="trim-title"><strong>Choose your 10 seconds</strong><span id="trimStartLabel">0.0 – 10.0 s</span></div><div id="trimTrack" class="trim-track" role="group" aria-label="Video timeline"><div class="trim-ruler"></div><div id="trimWindow" class="trim-window" aria-hidden="true"><span class="trim-grip">Ⅱ</span><span class="trim-grip">Ⅱ</span></div></div><input id="trimStart" type="range" min="0" max="0" step="0.1" value="0" oninput="updateTrimStart()" aria-label="Move the 10-second selection" style="width:100%;margin-top:10px"><p class="muted" id="trimHint">Drag the white window to select your clip.</p><div class="trim-actions"><button type="button" class="remove-video" onclick="removeSelectedVideo()" aria-label="Remove selected video">✕ Remove video</button></div><div class="music-picker"><div class="music-heading">Background music <small>Adjust original audio and music independently</small></div><div class="music-options"><button type="button" class="music-choice selected" data-music="original" onclick="selectMusic('original')">Original</button><button type="button" class="music-choice" data-music="chill" onclick="selectMusic('chill')">Chill</button><button type="button" class="music-choice" data-music="funny" onclick="selectMusic('funny')">Funny</button><button type="button" class="music-choice" data-music="unplugged" onclick="selectMusic('unplugged')">Unplugged</button></div><div class="audio-mixer"><label class="audio-mute"><input type="checkbox" id="muteOriginal" onchange="updateAudioMix()"> Mute original video sound</label><label>Original sound <output id="originalVolumeValue">100%</output><input id="originalVolume" type="range" min="0" max="100" value="100" oninput="updateAudioMix()"></label><label>Music <output id="musicVolumeValue">30%</output><input id="musicVolume" type="range" min="0" max="100" value="30" oninput="updateAudioMix()"></label></div><p class="muted" style="font-size:12px;margin:7px 0">Tap a style to preview the mix before posting.</p></div></div><label>Item name (45 characters max)<input id="name" maxlength="45" placeholder="e.g. Vintage lamp" oninput="updateTitleCount()"><small id="titleCount" style="display:block;text-align:right;color:#aaa;margin:-10px 0 14px">0 / 45 characters</small></label><label>Description (80 characters max)<input id="description" maxlength="80" placeholder="Describe your item briefly" oninput="updateDescriptionCount()"><small id="descriptionCount" style="display:block;text-align:right;color:#aaa;margin:-10px 0 14px">0 / 80 characters</small></label><label style="display:flex;align-items:center;gap:10px;margin:0 0 15px"><input id="negotiable" type="checkbox" style="width:20px;height:20px;margin:0;accent-color:#ed0646"><span>Negotiable price</span></label><label>Price (€)<input id="price" type="number" min="1" placeholder="250"></label><label>Approximate year (optional)<input id="itemYear" type="number" min="1000" max="2100" placeholder="e.g. 1970"></label><label style="display:flex;align-items:center;gap:10px;margin:0 0 15px"><input id="acceptTrade" type="checkbox" style="width:20px;height:20px;margin:0;accent-color:#ed0646"><span>Open to exchange — items of similar value, any period or category</span></label><label>Category<select id="category" style="width:100%;padding:13px;margin:8px 0 16px;border-radius:8px"><option>Furniture</option><option>Lighting</option><option>Art</option><option>Ceramics</option><option>Objects</option><option>Vintage</option></select></label><label>City<input id="city" placeholder="Lisbon"></label><label>Country<input id="country" placeholder="Portugal" required></label><label>Seller WhatsApp (with country code)<input id="phone" placeholder="+351..."></label><button class="primary" onclick="publish()">Publish listing</button><p class="muted">Published videos are saved online and visible to other users.</p></section>
@@ -1613,7 +1615,7 @@ async function openCloudflareProfile(token){
   const share=document.createElement('button');share.textContent='Share page';share.onclick=()=>sharePEFPublicSeller(sellerId);
   const location=document.createElement('p');location.textContent='Lisbon, Portugal';
   const website=document.createElement('a');website.href='https://www.galeriaparislisboa.com/';website.textContent='Visit website';website.target='_blank';website.rel='noopener';
-  const newsletter=document.createElement('button');newsletter.type='button';newsletter.textContent='Create a newsletter';newsletter.onclick=openPefNewsletter;
+  const newsletter=document.createElement('button');newsletter.type='button';newsletter.textContent='Create a newsletter';newsletter.onclick=()=>openPefNewsletter(token);
   info.append(h,location,website,view,share,newsletter);editGallerySettings(info,headers).catch(e=>{const note=document.createElement('p');note.textContent=e.message;info.append(note)});
   const ig=document.createElement('div');ig.className='cf-gallery-info';const igTitle=document.createElement('h3');igTitle.textContent='Instagram';
   const igLink=document.createElement('a');igLink.href='https://www.instagram.com/galerie_paris_lisbon/';igLink.textContent='@galerie_paris_lisbon';igLink.target='_blank';igLink.rel='noopener';
@@ -2275,25 +2277,130 @@ function pefNewsletterLink(key,id){
  return escapeHTML(url.href);
 }
 
-function pefNewsletterMarkup(subject,intro,pieces){
+const pefNewsletterFonts={
+ editorial:{label:'Editorial · Georgia + Arial',heading:'Georgia,serif',body:'Arial,sans-serif'},
+ modern:{label:'Modern · Helvetica',heading:'Helvetica,Arial,sans-serif',body:'Helvetica,Arial,sans-serif'},
+ classic:{label:'Classic · Georgia',heading:'Georgia,serif',body:'Georgia,serif'},
+ mono:{label:'Studio · Courier New',heading:'Courier New,monospace',body:'Courier New,monospace'}
+};
+const pefNewsletterContactLimit=500;
+const pefNewsletterEmail=/^[a-z0-9.!#$%&'*+\/=?^`_{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i;
+
+function pefNewsletterCsv(text){
+ const rows=[];
+ let row=[],cell='',quoted=false;
+ text=text.replace(/^\uFEFF/,'');
+ for(let i=0;i<text.length;i++){
+  const c=text[i];
+  if(c==='"'){
+   if(quoted&&text[i+1]==='"'){cell+='"';i++}
+   else quoted=!quoted;
+  }else if(!quoted&&(',;\t\r\n'.includes(c))){
+   row.push(cell.trim());cell='';
+   if(c==='\r'||c==='\n'){
+    if(c==='\r'&&text[i+1]==='\n')i++;
+    if(row.some(Boolean))rows.push(row);
+    row=[];
+   }
+  }else cell+=c;
+ }
+ if(quoted)throw Error('The CSV has an unclosed quoted field.');
+ row.push(cell.trim());if(row.some(Boolean))rows.push(row);
+ const header=rows[0]?.findIndex(value=>/^(e[-_ ]?mail(?: address)?|adresse e[-_ ]?mail|courriel)$/i.test(value))??-1;
+ const values=header>=0?rows.slice(1).map(row=>row[header]||''):rows.flat();
+ return [...new Set(values.map(value=>value.toLowerCase()).filter(value=>value.length<=254&&pefNewsletterEmail.test(value)))];
+}
+
+async function mountPefNewsletterContacts(host,token){
+ const el=(tag,text)=>Object.assign(document.createElement(tag),text?{textContent:text}:{});
+ const title=el('h2','Private mailing list');
+ const feedback=el('p');feedback.setAttribute('role','status');
+ host.append(title,feedback);
+ if(!token){feedback.textContent='Open the editor from your gallery account to import a CSV and copy recipients to Bcc.';return}
+ const endpoint='https://pef-design-api.galeriaparislisboa.workers.dev/api/gallery/newsletter-contacts';
+ const request=async (method,contacts)=>{
+  const headers={Authorization:'Bearer '+token};
+  if(contacts)headers['Content-Type']='application/json';
+  const response=await fetch(endpoint,{method,headers,body:contacts?JSON.stringify({contacts}):undefined});
+  const result=await response.json();
+  if(!response.ok)throw Error(result.error||'Could not access the mailing list.');
+  return result.contacts;
+ };
+ const csv=el('input');csv.type='file';csv.accept='.csv,text/csv';csv.hidden=true;
+ const actions=el('div');actions.className='pef-newsletter-actions';
+ const importCsv=el('button','Import CSV'),save=el('button','Save contacts'),copy=el('button','Copy to Bcc'),clear=el('button','Clear list');
+ for(const button of [importCsv,save,copy,clear])button.type='button';
+ actions.append(importCsv,save,copy,clear);
+ const manual=el('label','Email addresses');
+ const addresses=el('textarea');addresses.rows=3;addresses.placeholder='One email address per line';
+ manual.append(addresses);host.append(csv,manual,actions);
+ let stored=[],busy=true,ready=false;
+ const read=()=>[...new Set(addresses.value.toLowerCase().split(/[\s,;]+/).filter(Boolean))];
+ const show=contacts=>{addresses.value=contacts.join('\n')};
+ function sync(){
+  const current=read();
+  const dirty=JSON.stringify(current)!==JSON.stringify(stored);
+  addresses.disabled=csv.disabled=importCsv.disabled=busy||!ready;
+  save.disabled=busy||!ready||!dirty;
+  copy.disabled=busy||!ready||!current.length;
+  clear.disabled=busy||!ready||!current.length;
+ }
+ const validate=list=>{
+  if(list.length>pefNewsletterContactLimit||list.some(email=>email.length>254||!pefNewsletterEmail.test(email)))throw Error('Enter up to 500 valid email addresses.');
+  return list;
+ };
+ addresses.oninput=()=>{feedback.textContent=read().length+' address(es)';sync()};
+ importCsv.onclick=()=>csv.click();
+ csv.onchange=async()=>{
+  const file=csv.files[0];if(!file)return;
+  busy=true;sync();
+  try{
+   if(file.size>2e6)throw Error('Choose a CSV file smaller than 2 MB.');
+   const imported=pefNewsletterCsv(await file.text());
+   if(!imported.length)throw Error('No valid email addresses found in the CSV.');
+   const before=read();const contacts=validate([...new Set([...before,...imported])]);
+   show(contacts);feedback.textContent=(contacts.length-before.length)+' new address(es). Save contacts to keep them.';
+  }catch(error){feedback.textContent=error.message}
+  finally{csv.value='';busy=false;sync()}
+ };
+ save.onclick=async()=>{
+  busy=true;sync();
+  try{stored=await request('PATCH',validate(read()));show(stored);feedback.textContent='✓ '+stored.length+' address(es) saved.'}
+  catch(error){feedback.textContent=error.message}
+  finally{busy=false;sync()}
+ };
+ copy.onclick=async()=>{
+  try{await navigator.clipboard.writeText(validate(read()).join(', '));feedback.textContent='Paste the addresses into the Bcc (Cci) field of your email.'}
+  catch(error){feedback.textContent=error.message||'Could not copy the addresses.'}
+ };
+ clear.onclick=()=>{show([]);feedback.textContent='List cleared in this editor. Save contacts to apply.';sync()};
+ sync();feedback.textContent='Loading private contacts…';
+ try{stored=await request('GET');show(stored);ready=true;feedback.textContent=stored.length+' saved address(es).'}
+ catch(error){feedback.textContent=error.message}
+ finally{busy=false;sync()}
+}
+
+function pefNewsletterMarkup(subject,intro,pieces,font=pefNewsletterFonts.editorial){
  const card=(piece,lead=false)=>`<td class="piece" width="${lead?'100%':'50%'}" valign="top" style="padding:0 8px 22px"><a href="${pefNewsletterLink('listing',piece.id)}" style="color:#212121;text-decoration:none"><img src="${escapeHTML(piece.photos[0])}" alt="${escapeHTML(piece.title)}" width="${lead?544:264}" style="display:block;width:100%;height:auto;border:0"><strong style="display:block;padding-top:8px;font-size:16px">${escapeHTML(piece.title)}</strong></a>${piece.price?'<span style="font-size:14px;color:#555">'+escapeHTML(piece.price)+' €</span>':''}</td>`;
  const rows=pieces.slice(1).reduce((html,piece,i)=>html+(i%2?'':'<tr>')+card(piece)+(i%2?'</tr>':''),'');
  const grid=pieces.length%2===0&&pieces.length>1?rows+'<td class="empty" width="50%"></td></tr>':rows;
- const body=`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff;color:#212121;font-family:Arial,sans-serif"><tr><td align="center" style="padding:24px 10px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px"><tr><td colspan="2" style="padding:0 8px 20px"><p style="font-size:12px;letter-spacing:2px;margin:0 0 20px;text-transform:uppercase">Galerie Paris–Lisboa</p><h1 style="font-family:Georgia,serif;font-size:32px;font-weight:400;margin:0 0 12px">${escapeHTML(subject)}</h1><p style="font-size:16px;line-height:1.55;margin:0">${escapeHTML(intro).replace(/\r?\n/g,'<br>')}</p></td></tr>${pieces.length?'<tr>'+card(pieces[0],true).replace('<td ','<td colspan="2" ')+'</tr>':''}${grid}<tr><td colspan="2" style="padding:10px 8px 16px"><a href="${pefNewsletterLink('seller',pefNewsletterGalleryId)}" style="display:inline-block;background:#242424;color:#fff;text-decoration:none;border-radius:24px;padding:13px 20px;font-size:14px">Explore the gallery →</a></td></tr><tr><td colspan="2" style="padding:6px 8px;font-size:12px;color:#555">Galerie Paris–Lisboa · Pena, Lisbon</td></tr></table></td></tr></table>`;
+ const body=`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff;color:#212121;font-family:${font.body}"><tr><td align="center" style="padding:24px 10px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px"><tr><td colspan="2" style="padding:0 8px 20px"><p style="font-size:12px;letter-spacing:2px;margin:0 0 20px;text-transform:uppercase">Galerie Paris–Lisboa</p><h1 style="font-family:${font.heading};font-size:32px;font-weight:400;margin:0 0 12px">${escapeHTML(subject)}</h1><p style="font-size:16px;line-height:1.55;margin:0">${escapeHTML(intro).replace(/\r?\n/g,'<br>')}</p></td></tr>${pieces.length?'<tr>'+card(pieces[0],true).replace('<td ','<td colspan="2" ')+'</tr>':''}${grid}<tr><td colspan="2" style="padding:10px 8px 16px"><a href="${pefNewsletterLink('seller',pefNewsletterGalleryId)}" style="display:inline-block;background:#242424;color:#fff;text-decoration:none;border-radius:24px;padding:13px 20px;font-size:14px">Explore the gallery →</a></td></tr><tr><td colspan="2" style="padding:6px 8px;font-size:12px;color:#555">Galerie Paris–Lisboa · Pena, Lisbon</td></tr></table></td></tr></table>`;
  return {body,document:`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(subject)}</title><style>@media(max-width:480px){.piece{display:block;width:auto}.empty{display:none}}</style></head><body style="margin:0">${body}</body></html>`};
 }
 
-function openPefNewsletter(){
+function openPefNewsletter(token){
  if(document.querySelector('.pef-newsletter'))return;
  const dialog=document.createElement('dialog');
  dialog.className='pef-newsletter';
- dialog.innerHTML='<header><h1>Create a newsletter</h1><button type="button" data-close>Close</button></header><div class="pef-newsletter-layout"><section><label>Subject <input maxlength="120" value="New pieces from Galerie Paris–Lisboa"></label><label>Introduction <textarea rows="4" maxlength="1200">From our gallery in Lisbon’s Pena district, here are a few pieces we’d love you to discover.</textarea></label><h2>Select pieces</h2><p>The first selected piece leads the newsletter. Use the arrows to reorder.</p><div data-pieces></div></section><section><div class="pef-newsletter-preview"><h2>Email preview</h2><button type="button" data-mobile aria-pressed="false">Mobile</button></div><iframe title="Newsletter preview" sandbox></iframe><div class="pef-newsletter-actions"><button type="button" data-copy disabled>Copy newsletter</button><button type="button" data-download disabled>Download HTML</button></div></section></div><p role="status"></p>';
+ dialog.innerHTML='<header><h1>Create a newsletter</h1><button type="button" data-close>Close</button></header><div class="pef-newsletter-layout"><section><label>Subject <input maxlength="120" value="New pieces from Galerie Paris–Lisboa"></label><label>Introduction <textarea rows="4" maxlength="1200">From our gallery in Lisbon’s Pena district, here are a few pieces we’d love you to discover.</textarea></label><label>Typeface <select data-font></select></label><h2>Select pieces</h2><p>The first selected piece leads the newsletter. Use the arrows to reorder.</p><div data-pieces></div><section data-contacts></section></section><section><div class="pef-newsletter-preview"><h2>Email preview</h2><button type="button" data-mobile aria-pressed="false">Mobile</button></div><iframe title="Newsletter preview" sandbox></iframe><div class="pef-newsletter-actions"><button type="button" data-copy disabled>Copy newsletter</button><button type="button" data-download disabled>Download HTML</button></div></section></div><p role="status"></p>';
  const get=selector=>dialog.querySelector(selector);
  const subject=get('input'),intro=get('textarea'),frame=get('iframe'),list=get('[data-pieces]'),status=get('[role=status]');
- const copy=get('[data-copy]'),download=get('[data-download]'),mobile=get('[data-mobile]');
+ const copy=get('[data-copy]'),download=get('[data-download]'),mobile=get('[data-mobile]'),font=get('[data-font]');
+ for(const [key,style] of Object.entries(pefNewsletterFonts))font.add(new Option(style.label,key));
+ const markup=()=>pefNewsletterMarkup(subject.value,intro.value,selected,pefNewsletterFonts[font.value]);
  let available=[],selected=[];
  const render=()=>{
-  frame.srcdoc=pefNewsletterMarkup(subject.value,intro.value,selected).document;
+  frame.srcdoc=markup().document;
   copy.disabled=download.disabled=!selected.length||!subject.value.trim();
  };
  function renderPieces(){
@@ -2320,21 +2427,22 @@ function openPefNewsletter(){
   }
  }
  subject.oninput=intro.oninput=render;
+ font.onchange=render;
  mobile.onclick=()=>mobile.setAttribute('aria-pressed',String(frame.classList.toggle('pef-newsletter-mobile')));
  get('[data-close]').onclick=()=>dialog.close();
  dialog.onclose=()=>dialog.remove();
  copy.onclick=async()=>{
   try{
-   const html=pefNewsletterMarkup(subject.value,intro.value,selected).body;
+   const html=markup().body;
    await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([subject.value+'\n\n'+intro.value+'\n\n'+selected.map(x=>x.title+' '+pefNewsletterLink('listing',x.id)).join('\n')+'\n\n'+pefNewsletterLink('seller',pefNewsletterGalleryId)],{type:'text/plain'})})]);
    status.textContent='Newsletter copied. Paste it into your email editor.';
   }catch{status.textContent='Copy is unavailable in this browser. Use Download HTML.'}
  };
  download.onclick=()=>{
-  const url=URL.createObjectURL(new Blob([pefNewsletterMarkup(subject.value,intro.value,selected).document],{type:'text/html'}));
+  const url=URL.createObjectURL(new Blob([markup().document],{type:'text/html'}));
   const link=document.createElement('a');link.href=url;link.download='galerie-paris-lisboa-newsletter.html';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  };
- document.body.append(dialog);dialog.showModal();render();
+ document.body.append(dialog);dialog.showModal();render();mountPefNewsletterContacts(get('[data-contacts]'),token);
  status.textContent='Loading gallery pieces…';
  pefFetchCloudflareListings().then(rows=>{
   available=rows.filter(x=>x.seller_id===pefNewsletterGalleryId&&x.listing_status!=='sold'&&x.photos[0]?.startsWith('https://'));
