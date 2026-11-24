@@ -3014,7 +3014,7 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  if(document.querySelector('.pef-story-editor'))return;
  const dialog=document.createElement('dialog');
  dialog.className='pef-story-editor';
- dialog.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Story preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div></div><div class="pef-story-settings"><label>Photo <select data-photo></select></label><p>Drag text or the logo on the preview to move it.</p><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white">White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download Story</button><button type="button" data-share hidden>Share Story</button><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button></div><p role="status"></p></div></div>';
+ dialog.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Story preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div></div><div class="pef-story-settings"><label>Photo <select data-photo></select></label><p>Drag text or the logo on the preview to move it.</p><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white">White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download Story</button><button type="button" data-share hidden>Share Story</button><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
  const find=selector=>dialog.querySelector(selector);
  const canvas=find('canvas'),ctx=canvas.getContext('2d');
  const status=find('[role=status]'),photoSelect=find('[data-photo]'), stage=find('.pef-story-stage');
@@ -3180,6 +3180,11 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   const url=new URL('https://pef-design.vercel.app/');url.searchParams.set('listing',row.id);
   try{await navigator.clipboard.writeText(url.href);status.textContent='Link copied. Add it with the Link sticker in Instagram.'}
   catch{status.textContent=url.href}
+ };
+ find('[data-app-link]').onclick=async()=>{
+  const url='https://pef-design.vercel.app/';
+  try{await navigator.clipboard.writeText(url);status.textContent='PEF app link copied. Add it with the Link sticker in Instagram.'}
+  catch{status.textContent=url}
  };
  const galleryLink=find('[data-gallery-link]');
  galleryLink.disabled=!row.seller_id;
