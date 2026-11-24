@@ -3014,7 +3014,7 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  if(document.querySelector('.pef-story-editor'))return;
  const dialog=document.createElement('dialog');
  dialog.className='pef-story-editor';
- dialog.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Story preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div></div><div class="pef-story-settings"><label>Photo <select data-photo></select></label><p>Drag text or the logo on the preview to move it.</p><div data-layers></div><fieldset><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white">White</option></select></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download Story</button><button type="button" data-share hidden>Share Story</button><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button></div><p role="status"></p></div></div>';
+ dialog.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Story preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div></div><div class="pef-story-settings"><label>Photo <select data-photo></select></label><p>Drag text or the logo on the preview to move it.</p><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white">White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download Story</button><button type="button" data-share hidden>Share Story</button><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button></div><p role="status"></p></div></div>';
  const find=selector=>dialog.querySelector(selector);
  const canvas=find('canvas'),ctx=canvas.getContext('2d');
  const status=find('[role=status]'),photoSelect=find('[data-photo]'), stage=find('.pef-story-stage');
@@ -3022,7 +3022,7 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  const photos=(Array.isArray(row.photos)?row.photos:[]).filter(url=>typeof url==='string'&&url.startsWith('https://'));
  const layers=[
   {name:'Title',text:row.title||'',visible:true,size:62,x:90,y:1370},
-  {name:'Details',text:row.description||row.object_date||'',visible:false,size:38,x:90,y:1540},
+  {name:'Description',text:row.description||'',visible:false,size:38,x:90,y:1540},
   {name:'Price',text:row.price!=null?row.price+' €':'',visible:false,size:44,x:90,y:1700},
  ];
  const fonts={
@@ -3031,10 +3031,12 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   'Playful':'"Trebuchet MS",sans-serif',
   'Typewriter':'"Courier New",monospace',
   'Bold poster':'Impact,"Arial Black",sans-serif',
-  'Handwritten':'"Noteworthy","Comic Sans MS",cursive',
  };
- for(const layer of layers)Object.assign(layer,{font:'Modern',color:'#ffffff',background:'#222222',pill:true});
- const logo={x:90,y:225};
+ const typeface=find('[data-typeface]');
+ for(const font of Object.keys(fonts))typeface.add(new Option(font,font));
+ typeface.onchange=draw;
+ for(const layer of layers)Object.assign(layer,{color:'#ffffff',background:'#222222',pill:false});
+ const logo={x:90,y:225,width:265};
  let logoImage=null,logoVersion=0,image=null,loadVersion=0,drag=null;
  const bounds=new Map();
  function lines(text,maximum){
@@ -3057,13 +3059,14 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   }
   bounds.clear();
   if(logoImage){
-   const width=265,height=width*logoImage.naturalHeight/logoImage.naturalWidth;
+   const width=logo.width,height=width*logoImage.naturalHeight/logoImage.naturalWidth;
+   logo.x=Math.min(logo.x,1080-width-36);logo.y=Math.min(logo.y,1920-height-36);
    ctx.drawImage(logoImage,logo.x,logo.y,width,height);
    bounds.set(logo,{x:logo.x,y:logo.y,w:width,h:height});
   }
   for(const layer of layers){
    if(!layer.visible||!layer.text.trim())continue;
-   ctx.font=(layer.name==='Title'?'600 ':'500 ')+layer.size+'px '+fonts[layer.font];
+   ctx.font=(layer.name==='Title'?'600 ':'500 ')+layer.size+'px '+fonts[typeface.value];
    ctx.textBaseline='top';
    const max=Math.max(110,1080-layer.x-60);
    const wrapped=lines(layer.text,max),lineHeight=Math.round(layer.size*1.18);
@@ -3105,20 +3108,17 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   const size=document.createElement('input');size.type='range';size.min=24;size.max=96;size.value=layer.size;size.setAttribute('aria-label',layer.name+' size');
   const controls=document.createElement('div');controls.className='pef-story-layer-controls';
   const labelFor=(text,input)=>{const label=document.createElement('label');label.append(text,input);return label};
-  const type=document.createElement('select');
-  for(const font of Object.keys(fonts))type.add(new Option(font,font));
   const color=document.createElement('input');color.type='color';color.value=layer.color;
   const background=document.createElement('input');background.type='color';background.value=layer.background;
   const pill=document.createElement('input');pill.type='checkbox';pill.checked=layer.pill;
   const pillLabel=labelFor('Rounded background',pill);pillLabel.className='pef-story-switch';
   const palette=document.createElement('div');palette.className='pef-story-palette';
-  const backgroundLabel=labelFor('Background color',background);
+  const backgroundLabel=labelFor('Background color',background);backgroundLabel.hidden=!layer.pill;
   palette.append(labelFor('Text color',color),backgroundLabel);
-  type.onchange=()=>{layer.font=type.value;draw()};
   color.oninput=()=>{layer.color=color.value;draw()};
   background.oninput=()=>{layer.background=background.value;draw()};
   pill.onchange=()=>{layer.pill=pill.checked;backgroundLabel.hidden=!layer.pill;draw()};
-  controls.append(text,labelFor('Size',size),labelFor('Typeface',type),pillLabel,palette);
+  controls.append(text,labelFor('Size',size),pillLabel,palette);
   function sync(){controls.hidden=!layer.visible;draw()}
   toggle.onchange=()=>{layer.visible=toggle.checked;sync()};
   text.oninput=()=>{layer.text=text.value;draw()};
@@ -3145,9 +3145,12 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   draw();
  };
  canvas.onpointerup=canvas.onpointercancel=canvas.onlostpointercapture=()=>{drag=null};
+ const logoSize=find('[data-logo-size]');
+ logoSize.oninput=()=>{logo.width=Number(logoSize.value);draw()};
  find('[data-logo]').onchange=event=>{
   const version=++logoVersion,variant=event.target.value;
   logoImage=null;draw();
+  find('[data-logo-size-row]').hidden=!variant;
   if(!['black','white'].includes(variant))return;
   const candidate=new Image();
   candidate.onload=()=>{if(version===logoVersion){logoImage=candidate;draw()}};
