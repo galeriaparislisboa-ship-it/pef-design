@@ -1249,10 +1249,48 @@ document.addEventListener('click',()=>{document.querySelectorAll('#feed video').
 function pefMarkActive(){}
 async function refreshAuthUI(){const el=document.getElementById('authStatus');if(!el)return;try{const {data}=await sb.auth.getUser();currentUser=data?.user||null;pefSyncProfileAuth();el.textContent=currentUser?'Signed in: '+currentUser.email:'Sign in to post your videos.';document.getElementById('authEmail').style.display=currentUser?'none':'';document.getElementById('authLogin').style.display=currentUser?'none':'';document.getElementById('authGoogle').style.display=currentUser?'none':'';document.querySelector('.pef-auth-divider').style.display=currentUser?'none':'';document.getElementById('authLogout').style.display=currentUser?'':'none';document.getElementById('authHelp').style.display=currentUser?'none':'';document.getElementById('authCodeArea').style.display=currentUser?'none':document.getElementById('authCodeArea').style.display;if(!document.getElementById('profile').classList.contains('hidden'))loadPEFQueue()}catch(e){el.textContent='Sign-in unavailable: '+e.message}}
 async function completeLoginFromLink(){if(!sb)return alert('Authentication unavailable');const raw=document.getElementById('authLinkPaste').value.trim();if(!raw)return alert('Paste the full email link first');try{const u=new URL(raw);const hash=new URLSearchParams(u.hash.replace(/^#/,''));const tokenHash=u.searchParams.get('token_hash')||hash.get('token_hash');const type=u.searchParams.get('type')||hash.get('type')||'magiclink';const code=u.searchParams.get('code');const access=hash.get('access_token'),refresh=hash.get('refresh_token');let result;if(tokenHash)result=await sb.auth.verifyOtp({token_hash:tokenHash,type:type==='signup'?'signup':type==='recovery'?'recovery':'magiclink'});else if(code)result=await sb.auth.exchangeCodeForSession(code);else if(access&&refresh)result=await sb.auth.setSession({access_token:access,refresh_token:refresh});else throw Error('This link does not contain a valid sign-in token. Copy the complete link from your email.');if(result.error)throw result.error;document.getElementById('authLinkPaste').value='';await refreshAuthUI();alert('Signed in on this device. Your session is saved.')}catch(e){alert('Sign-in failed: '+e.message)}}
-async function googleLogin(){if(!sb)return alert('Google sign-in is unavailable.');const btn=document.getElementById('authGoogle');btn.disabled=true;try{const redirectTo=location.origin+location.pathname;const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo,skipBrowserRedirect:false}});if(error)throw error}catch(e){alert('Google sign-in is not yet configured: '+e.message);btn.disabled=false}}
+let pefGoogleWindow;
+function googleLogin(){
+ pefGoogleWindow=window.open('https://pef-design-api.galeriaparislisboa.workers.dev/auth/google/start?app=production','pefGoogleLogin','popup,width=500,height=650');
+ if(!pefGoogleWindow)document.getElementById('authStatus').textContent='Allow pop-ups to continue with Google.';
+}
+window.addEventListener('message',async event=>{
+ if(event.origin!=='https://pef-design-api.galeriaparislisboa.workers.dev'||event.source!==pefGoogleWindow||event.data?.type!=='pef-google-auth'||event.data.role!=='gallery'||typeof event.data.token!=='string')return;
+ sessionStorage.setItem('pefCloudflareSession',event.data.token);
+ const sellerId='f81528f3-3c3c-4590-9ee9-543f950b6884';
+ if(!items.some(item=>String(item.sellerId)===sellerId))await loadRemote();
+ openPEFPublicSeller(sellerId);
+});
 function pefRestorePendingEmail(){const email=localStorage.getItem('pef_pending_login_email');const field=document.getElementById('authEmail');if(email&&field&&!field.value){field.value=email;const area=document.getElementById('authCodeArea');if(area)area.style.display='block'}}document.addEventListener('DOMContentLoaded',pefRestorePendingEmail);
-async function emailLogin(){const email=document.getElementById('authEmail').value.trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return alert('Enter a valid email address.');if(!sb)return alert('Sign-in is temporarily unavailable.');const btn=document.getElementById('authLogin');btn.disabled=true;btn.textContent='Sending…';try{const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}});if(error)throw error;localStorage.setItem('pef_pending_login_email',email);document.getElementById('authEmail').value=email;document.getElementById('authCodeArea').style.display='block';document.getElementById('authStatus').textContent='Your code is on its way. Enter it below to continue.';document.getElementById('authCode').focus()}catch(error){alert(error.message.includes('rate limit')?'Too many requests. Please wait before requesting another code.':error.message)}finally{btn.disabled=false;btn.textContent='Resend email code ↗'}}
-async function verifyEmailCode(){const email=(document.getElementById('authEmail').value.trim()||localStorage.getItem('pef_pending_login_email')||'').toLowerCase();const token=document.getElementById('authCode').value.replace(/\D/g,'').trim();if(!/^(?:\d{6}|\d{8})$/.test(token))return alert('Enter the email code from your email.');const btn=document.getElementById('authVerify');btn.disabled=true;btn.textContent='Verifying…';try{const {data,error}=await sb.auth.verifyOtp({email,token,type:'email'});if(error)throw error;if(!data?.session)throw Error('No session was returned.');localStorage.removeItem('pef_pending_login_email');document.getElementById('authCode').value='';document.getElementById('authCodeArea').style.display='none';await refreshAuthUI();await stats();await pefCompletePendingSubscription()}catch(e){alert('Code not accepted: '+e.message+'\n\nUse the most recent email code sent to '+email+'. If your email contains only a login link, use that link instead. The email template must contain the email token.')}finally{btn.disabled=false;btn.textContent='Verify & enter →'}}
+async function pefCodeRequest(action, body){
+ const response=await fetch('https://pef-design-api.galeriaparislisboa.workers.dev/api/auth/code/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const result=await response.json();
+ if(!response.ok)throw Error(result.error||'Sign-in unavailable');
+ return result;
+}
+async function emailLogin(){
+ const email=document.getElementById('authEmail').value.trim().toLowerCase();
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return alert('Enter a valid email address.');
+ const button=document.getElementById('authLogin'),status=document.getElementById('authStatus');
+ button.disabled=true;
+ try{await pefCodeRequest('send',{email});document.getElementById('authCodeArea').style.display='block';status.textContent='If this account is eligible, check your email for a six-digit code.';document.getElementById('authCode').focus()}
+ catch(error){status.textContent=error.message}
+ finally{button.disabled=false}
+}
+async function verifyEmailCode(){
+ const email=document.getElementById('authEmail').value.trim().toLowerCase(),code=document.getElementById('authCode').value.trim();
+ const button=document.getElementById('authVerify'),status=document.getElementById('authStatus');
+ if(!/^\d{6}$/.test(code)){status.textContent='Enter the six-digit code.';return}
+ button.disabled=true;
+ try{const result=await pefCodeRequest('verify',{email,code});sessionStorage.setItem('pefCloudflareSession',result.token);document.getElementById('authCode').value='';document.getElementById('authCodeArea').style.display='none';status.textContent='Cloudflare sign-in verified ('+result.role+').';
+ if(result.role==='gallery'){
+  const sellerId='f81528f3-3c3c-4590-9ee9-543f950b6884';
+  if(!items.some(item=>String(item.sellerId)===sellerId))await loadRemote();
+  openPEFPublicSeller(sellerId);
+ }}
+ catch(error){status.textContent=error.message}
+ finally{button.disabled=false}
+}
 async function emailLogout(){await sb.auth.signOut();pefMarkActive();refreshAuthUI()}
 function listingMetaSuffix(){const year=document.getElementById('itemYear')?.value.trim()||'';return (document.getElementById('negotiable')?.checked?' [N]':'')+(document.getElementById('acceptTrade')?.checked?' [T]':'')+(year?' [Y'+year+']':'')}
 function pefOptimizedVideoUrl(url){
