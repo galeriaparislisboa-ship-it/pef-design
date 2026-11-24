@@ -21,6 +21,7 @@ async function authorize(request,env){
  const archived=await env.DB.prepare('SELECT 1 FROM pef_archived_accounts a JOIN users u ON u.id=a.user_id WHERE lower(u.email)=?').bind(user.email.toLowerCase()).first();
  return archived?null:user;
 }
+function validPostId(value){return typeof value==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)}
 const parseArray=(value)=>{if(Array.isArray(value))return value;if(typeof value!=='string')return [];try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[]}catch{return []}};
 function listingWithMedia(row){
  const photos=parseArray(row.photos).filter(url=>typeof url==='string'&&/^https:\/\//.test(url));
@@ -123,7 +124,7 @@ export default {
    if(!env.DB)return out({error:'Database unavailable'},503);
    try{
     await initializeModeration(env.DB);
-    const result=await env.DB.prepare(`SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,likes,whatsapp_clicks,created_at,photos,video_url,media_order,
+    const result=await env.DB.prepare(`SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,likes,whatsapp_clicks,created_at,photos,video_url,media_order,trim_start,trim_end,
      (SELECT badge FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id) AS seller_badge,
      (SELECT display_name FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id AND badge<>'none') AS seller_name
      FROM pef_objects WHERE ${visibleListing} ORDER BY created_at DESC LIMIT 100`).all();
@@ -140,7 +141,52 @@ export default {
    const {results}=await env.DB.prepare('SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,likes,whatsapp_clicks,created_at,photos,video_url,is_hidden FROM pef_objects WHERE seller_id=? ORDER BY created_at DESC').bind(account.id).all();
    return out({listings:results.map(listingWithMedia)});
   }
-  // Gallery metadata editing; media and publishing remain disabled.
+  if(path==='/api/listings'&&method==='POST'){
+   const user=await authorize(request,env);
+   if(!user)return out({error:'Sign in to publish'},401);
+   if(!env.DB||!env.MEDIA)return out({error:'Storage unavailable'},503);
+   const account=await env.DB.prepare('SELECT u.id,b.badge FROM users u LEFT JOIN pef_seller_badges b ON b.seller_id=u.id WHERE lower(u.email)=? LIMIT 1').bind(user.email.toLowerCase()).first();
+   if(!account)return out({error:'Account not found'},403);
+   const input=await request.json().catch(()=>null);
+   if(!validPostId(input?.draftId))return out({error:'Invalid draft identifier'},400);
+   const id=account.id+'_'+input.draftId;
+   const old=await env.DB.prepare('SELECT id,is_hidden FROM pef_objects WHERE id=? AND seller_id=?').bind(id,account.id).first();
+   if(old)return out({id,published:!old.is_hidden});
+   const {title,description,category,price,city,country,whatsapp,photos,video_url='',object_date='',negotiable=false,trade=false}=input;
+   const required=[title,description,category,city,country,whatsapp];
+   if(required.some(value=>typeof value!=='string'||!value.trim())||title.length>60||description.length>80||[category,city,country].some(value=>value.length>60)||
+     !/^\d+(?:\.\d{1,2})?$/.test(String(price))||Number(price)<=0||!/^\+?[0-9\s().-]{7,20}$/.test(whatsapp)||
+     typeof negotiable!=='boolean'||typeof trade!=='boolean'||typeof object_date!=='string'||(object_date&&!/^c\. \d{4}$/.test(object_date)))return out({error:'Check the listing details and contact number'},400);
+   if(!Array.isArray(photos)||photos.length<2||photos.length>5||new Set(photos).size!==photos.length)return out({error:'Select 2 to 5 photos'},400);
+   const base='/media/listings/'+id+'/';
+   function mediaKey(value,extension){
+    if(typeof value!=='string')return null;
+    try{const link=new URL(value);const name=link.pathname.slice(base.length);
+     return link.origin===url.origin&&link.pathname.startsWith(base)&&!link.search&&!link.hash&&extension.test(name)?link.pathname.slice('/media/'.length):null;
+    }catch{return null}
+   }
+   const photoKeys=photos.map(photo=>mediaKey(photo,/^[a-f0-9-]{36}\.(jpg|png|webp)$/));
+   const videoKey=video_url?mediaKey(video_url,/^[a-f0-9-]{36}\.(mp4|webm|mov)$/):null;
+   if(photoKeys.some(key=>!key)||(video_url&&!videoKey))return out({error:'Upload media for this draft before publishing'},400);
+   const trimStart=Number(input.trim_start??0);
+   if(!Number.isFinite(trimStart)||trimStart<0||trimStart>86400)return out({error:'Invalid video selection'},400);
+   const ordered=photos.map((url,index)=>({type:'photo',url,index}));
+   if(videoKey)ordered.splice(1,0,{type:'video',url:video_url});
+   const hidden=['verified','professional','gallery'].includes(account.badge)?0:1;
+   try{
+    const objects=await Promise.all([...photoKeys,...(videoKey?[videoKey]:[])].map(key=>env.MEDIA.head(key)));
+    if(objects.some(object=>!object))return out({error:'One or more media files are missing'},400);
+    const row=await env.DB.prepare(`INSERT INTO pef_objects
+      (id,seller_id,title,description,category,price,city,country,whatsapp,photos,video_url,media_order,trim_start,trim_end,object_date,negotiable,trade,is_hidden,created_at)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP
+      WHERE NOT EXISTS (SELECT 1 FROM pef_archived_accounts WHERE user_id=?)
+      ON CONFLICT(id) DO NOTHING RETURNING id,is_hidden`)
+     .bind(id,account.id,title.trim(),description.trim(),category.trim(),String(price),city.trim(),country.trim(),whatsapp.trim(),JSON.stringify(photos),video_url,JSON.stringify(ordered),videoKey?trimStart:0,videoKey?trimStart+10:0,object_date,Number(negotiable),Number(trade),hidden,account.id).first();
+    const saved=row||await env.DB.prepare('SELECT id,is_hidden FROM pef_objects WHERE id=? AND seller_id=?').bind(id,account.id).first();
+    return saved?out({id,published:!saved.is_hidden},row?201:200):out({error:'Account unavailable'},403);
+   }catch(error){console.error('Listing creation failed',error.message);return out({error:'Unable to publish this listing'},500);}
+  }
+  // Gallery metadata editing.
   if(/^\/api\/listings\/[^/]+$/.test(path)&&method==='PATCH'){
    const user=await authorize(request,env);
    if(!user)return out({error:'Unauthorized'},401);
@@ -177,28 +223,46 @@ value=String(value).trim();
   }
   // R2 media: authenticated upload, per-listing ownership and atomic metadata save.
   const mediaMatch=path.match(/^\/api\/listings\/([^/]+)\/media$/);
+  const stagedMatch=path.match(/^\/api\/listings\/stage\/([^/]+)$/);
   const uploadMatch=path.match(/^\/api\/listings\/([^/]+)\/upload$/);
-  if(method==='GET'&&path.startsWith('/media/')){
+  if((method==='GET'||method==='HEAD')&&path.startsWith('/media/')){
    if(!env.MEDIA)return out({error:'Media storage unavailable'},503);
    const key=path.slice('/media/'.length);
-   if(!/^listings\/[a-zA-Z0-9_-]+\/[a-f0-9-]{36}\.(jpg|png|webp|mp4|webm)$/.test(key))return out({error:'Not found'},404);
-   const object=await env.MEDIA.get(key);
+   if(!/^listings\/[a-zA-Z0-9_-]+\/[a-f0-9-]{36}\.(jpg|png|webp|mp4|webm|mov)$/.test(key))return out({error:'Not found'},404);
+   const range=request.headers.get('Range');
+   const metadata=range||method==='HEAD'?await env.MEDIA.head(key):null;
+   if((range||method==='HEAD')&&!metadata)return out({error:'Not found'},404);
+   let offset=0,length=metadata?.size,status=200;
+   if(range&&method==='GET'){
+    const match=range.match(/^bytes=(\d*)-(\d*)$/);
+    if(match&&(match[1]||match[2])){
+     const size=metadata.size;
+     offset=match[1]?Number(match[1]):Math.max(0,size-Number(match[2]));
+     const end=match[1]&&match[2]?Math.min(size-1,Number(match[2])):size-1;
+     if(offset>=size||offset>end)return new Response(null,{status:416,headers:{...headers,'Content-Range':'bytes */'+size}});
+     length=end-offset+1;status=206;
+    }
+   }
+   const object=method==='HEAD'?metadata:await env.MEDIA.get(key,status===206?{range:{offset,length}}:undefined);
    if(!object)return out({error:'Not found'},404);
-   return new Response(object.body,{headers:{'Content-Type':object.httpMetadata?.contentType||'application/octet-stream','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff',...headers}});
+   const mediaHeaders={...headers,'Content-Type':object.httpMetadata?.contentType||'application/octet-stream','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff','Accept-Ranges':'bytes','Content-Length':String(status===206?length:object.size)};
+   if(status===206)mediaHeaders['Content-Range']='bytes '+offset+'-'+(offset+length-1)+'/'+metadata.size;
+   return new Response(method==='HEAD'?null:object.body,{status,headers:mediaHeaders});
   }
-  if((uploadMatch&&method==='POST')||(mediaMatch&&method==='PATCH')){
+  if(((uploadMatch||stagedMatch)&&method==='POST')||(mediaMatch&&method==='PATCH')){
    const user=await authorize(request,env);
    if(!user)return out({error:'Unauthorized'},401);
    if(!env.DB||!env.MEDIA)return out({error:'Storage unavailable'},503);
-   const id=decodeURIComponent((uploadMatch||mediaMatch)[1]);
    const account=await env.DB.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').bind(user.email.toLowerCase()).first();
    if(!account)return out({error:'Account not found'},403);
-   const existing=await env.DB.prepare('SELECT id,seller_id,photos,video_url FROM pef_objects WHERE id=? LIMIT 1').bind(id).first();
+   if(stagedMatch&&!validPostId(stagedMatch[1]))return out({error:'Invalid draft identifier'},400);
+   const id=stagedMatch?account.id+'_'+stagedMatch[1]:decodeURIComponent((uploadMatch||mediaMatch)[1]);
+   const existing=stagedMatch?{seller_id:account.id}:await env.DB.prepare('SELECT id,seller_id,photos,video_url FROM pef_objects WHERE id=? LIMIT 1').bind(id).first();
    if(!existing)return out({error:'Listing not found'},404);
    if(user.role!=='admin'&&existing.seller_id!==account.id)return out({error:'Forbidden'},403);
-   if(uploadMatch){
+   if(uploadMatch||stagedMatch){
     const type=request.headers.get('Content-Type')||'';
-    const formats={'image/jpeg':['jpg',8*1024*1024],'image/png':['png',8*1024*1024],'image/webp':['webp',8*1024*1024],'video/mp4':['mp4',35*1024*1024],'video/webm':['webm',35*1024*1024]};
+    const formats={'image/jpeg':['jpg',8*1024*1024],'image/png':['png',8*1024*1024],'image/webp':['webp',8*1024*1024],'video/mp4':['mp4',35*1024*1024],'video/quicktime':['mov',35*1024*1024],'video/webm':['webm',35*1024*1024]};
     const format=formats[type];
     if(!format)return out({error:'Unsupported media format'},415);
     const length=Number(request.headers.get('Content-Length')||0);
@@ -206,7 +270,7 @@ value=String(value).trim();
     const data=await request.arrayBuffer();
     if(!data.byteLength||data.byteLength>format[1])return out({error:'File too large or empty'},413);
     const bytes=new Uint8Array(data),jpg=bytes[0]===255&&bytes[1]===216&&bytes[2]===255,png=bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71,webp=String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP',mp4=String.fromCharCode(...bytes.slice(4,8))==='ftyp',webm=bytes[0]===26&&bytes[1]===69&&bytes[2]===223&&bytes[3]===163;
-    if(!({'image/jpeg':jpg,'image/png':png,'image/webp':webp,'video/mp4':mp4,'video/webm':webm})[type])return out({error:'File content does not match format'},415);
+    if(!({'image/jpeg':jpg,'image/png':png,'image/webp':webp,'video/mp4':mp4,'video/quicktime':mp4,'video/webm':webm})[type])return out({error:'File content does not match format'},415);
     const key='listings/'+id+'/'+crypto.randomUUID()+'.'+format[0];
     await env.MEDIA.put(key,data,{httpMetadata:{contentType:type}});
     return out({ok:true,url:new URL('/media/'+key,url).toString(),type:type.startsWith('image/')?'photo':'video'});

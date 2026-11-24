@@ -10,7 +10,7 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   CREATE TABLE pef_objects (id TEXT PRIMARY KEY,seller_id TEXT,title TEXT,description TEXT,
    category TEXT,price TEXT,city TEXT,country TEXT,whatsapp TEXT,listing_status TEXT,promotion_price TEXT,
    object_date TEXT,negotiable INTEGER,trade INTEGER,views INTEGER,likes INTEGER,whatsapp_clicks INTEGER,
-   created_at TEXT,photos TEXT,video_url TEXT,media_order TEXT,is_hidden INTEGER);
+   created_at TEXT,photos TEXT,video_url TEXT,media_order TEXT,is_hidden INTEGER,trim_start REAL,trim_end REAL);
   INSERT INTO users VALUES ('admin','ndondina@muchimuchi.fr','Admin'),
    ('seller','galeriaparislisboa@gmail.com','Gallery'),('buyer','buyer@example.test','Buyer');
   INSERT INTO pef_objects(id,seller_id,title,photos) VALUES ('object','seller','Design piece','[]'),('second','seller','Other piece','[]');
