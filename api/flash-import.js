@@ -42,6 +42,30 @@ function decode(text){
  });
 }
 const plain=text=>decode(String(text||'').replace(/<[^>]+>/g,' ')).replace(/\s+/g,' ').trim();
+function euroPrice(value){
+ let amount=plain(value).replace(/[\s\u202f€]/g,'');
+ if(/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(amount))amount=amount.replace(/\./g,'');
+ if(/^\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$/.test(amount))amount=amount.replace(/,/g,'');
+ amount=amount.replace(',','.');
+ return /^\d+(?:\.\d{1,2})?$/.test(amount)&&Number(amount)>0&&Number.isFinite(Number(amount))?Number(amount).toFixed(2):null;
+}
+function extractPrice(product,meta,html){
+ for(const offer of [product?.offers].flat()){
+  if(String(offer?.priceCurrency||'').toUpperCase()==='EUR'){
+   const price=euroPrice(offer.price);
+   if(price)return price;
+  }
+ }
+ for(const key of ['product:price','og:price']){
+  if(meta.get(key+':currency')?.[0]?.toUpperCase()==='EUR'){
+   const price=euroPrice(meta.get(key+':amount')?.[0]);
+   if(price)return price;
+  }
+ }
+ const visible=html.match(/<[^>]+class=["'][^"']*\b(?:product-price|ProductItem-product-price)\b[^"']*["'][^>]*>([\s\S]{0,600}?)(?=<\/(?:div|p)>)/i)?.[1];
+ const match=plain(visible).match(/(?:€\s*([\d][\d.,\s]*)|([\d][\d.,\s]*)\s*€)/);
+ return match?euroPrice(match[1]||match[2]):null;
+}
 function extract(html,base){
  const meta=new Map();
  for(const tag of html.matchAll(/<meta\b[^>]*>/gi)){
@@ -80,7 +104,7 @@ function extract(html,base){
  const slug=decodeURIComponent(base.pathname.split('/').filter(Boolean).at(-1)||'').replace(/-/g,' ');
  const title=[productHeading?.[2],product?.name,visibleHeading,meta.get('og:title')?.[0],slug].map(plain).find(value=>value&&!genericTitle.test(value));
  if(!title||!links.size)throw Error('No product title and photos were found.');
- return {title,description:plain(product?.description||meta.get('og:description')?.[0]||meta.get('description')?.[0]),photos:[...links.values()].slice(0,5)};
+ return {title,price:extractPrice(product,meta,html),description:plain(product?.description||meta.get('og:description')?.[0]||meta.get('description')?.[0]),photos:[...links.values()].slice(0,5)};
 }
 module.exports=async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');

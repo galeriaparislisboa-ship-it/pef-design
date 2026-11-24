@@ -1474,10 +1474,10 @@ async function pefFlashImport(){
   name.value=product.title.slice(0,name.maxLength);
   description.value=product.description.slice(0,description.maxLength);
   document.getElementById('category').value='All';
-  document.getElementById('price').value='';
+  document.getElementById('price').value=product.price??'';
   pefSelectedPhotoFiles=photos;
   pefSyncPhotoInput();pefRenderSelectedPhotos();updateTitleCount();updateDescriptionCount();savePostMedia();
-  status.textContent=photos.length+' photo(s) imported. '+(photos.length<2?'Add another photo and set the price.':'Set the price before publishing.');
+  status.textContent=photos.length+' photo(s) imported. '+[photos.length<2?'Add another photo.':'',product.price?'Price imported: €'+product.price+'.':'Set the price before publishing.'].filter(Boolean).join(' ');
  }catch(error){status.textContent=error.message||'Import unavailable.'}
  finally{button.disabled=false}
 }
