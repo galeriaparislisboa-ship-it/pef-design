@@ -69,6 +69,23 @@ export default {
    return out({token:payload+'.'+await sign(env.SESSION_SECRET,payload),role,email,expires_in:28800});
   }
   if(path==='/api/auth/me'&&method==='GET'){const user=await authorize(request,env);return user?out({role:user.role,email:user.email,userId:user.userId}):out({error:'Unauthorized'},401);}
+  if(path==='/api/gallery/newsletter-contacts'){
+   const user=await authorize(request,env);
+   if(user?.role!=='gallery'||user.email!=='galeriaparislisboa@gmail.com')return out({error:'Forbidden'},403);
+   if(method!=='GET'&&method!=='PATCH')return out({error:'Method not allowed'},405);
+   if(!env.DB)return out({error:'Address book unavailable'},503);
+   await env.DB.prepare('CREATE TABLE IF NOT EXISTS pef_newsletter_contacts (owner TEXT PRIMARY KEY, contacts TEXT NOT NULL)').run();
+   if(method==='GET'){
+    const row=await env.DB.prepare('SELECT contacts FROM pef_newsletter_contacts WHERE owner=?').bind(user.email).first();
+    return out({contacts:row?JSON.parse(row.contacts):[]});
+   }
+   const input=await request.json().catch(()=>null);
+   const emailPattern=/^[a-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i;
+   if(!Array.isArray(input?.contacts)||input.contacts.length>500||input.contacts.some(email=>typeof email!=='string'||email.length>254||!emailPattern.test(email)))return out({error:'Enter up to 500 valid email addresses'},400);
+   const contacts=[...new Set(input.contacts.map(email=>email.toLowerCase()))];
+   await env.DB.prepare('INSERT INTO pef_newsletter_contacts (owner,contacts) VALUES (?,?) ON CONFLICT(owner) DO UPDATE SET contacts=excluded.contacts').bind(user.email,JSON.stringify(contacts)).run();
+   return out({contacts});
+  }
   if(path==='/api/gallery/profile'){
    if(!env.MEDIA)return out({error:'Storage unavailable'},503);
    const object=await env.MEDIA.get('gallery/paris-lisboa/profile.json');
