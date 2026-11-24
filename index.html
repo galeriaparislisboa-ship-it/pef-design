@@ -951,6 +951,14 @@ transform:none!important;
 .pef-story-settings :is(select,input[type=text]){width:100%;min-width:0;padding:8px;border:1px solid #aaa;border-radius:9px;background:white;color:#222;font:16px system-ui}
 .pef-story-settings input[type=range]{width:100%;accent-color:#555}
 .pef-story-layer-controls:not([hidden]){display:grid;gap:7px;margin-top:7px}
+.pef-story-stage .pef-story-quick{position:absolute;z-index:2;inset:8px 8px auto;display:grid;gap:6px;background:#f5f5f5;color:#222;border:1px solid #aaa;border-radius:13px;padding:8px}
+.pef-story-stage .pef-story-quick[hidden],.pef-story-selection[hidden]{display:none!important}
+.pef-story-quick>div{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.pef-story-quick input:not([type=color]){width:100%;min-width:0;font-size:16px}
+.pef-story-quick input[type=color]{width:34px;height:32px;padding:2px}
+.pef-story-editor .pef-story-quick button{min-height:32px;padding:3px 7px;font-size:11px}
+.pef-story-quick button[aria-pressed=true]{background:#555;color:#fff}
+.pef-story-selection{position:absolute;pointer-events:none;border:1px solid #fff;border-radius:5px;box-shadow:0 0 0 1px #222}
 .pef-story-palette{display:flex;flex-wrap:wrap;gap:12px}
 .pef-story-palette input[type=color]{width:48px;height:34px;padding:2px;border:1px solid #aaa;border-radius:7px;background:#fff}
 .pef-story-settings [hidden]{display:none!important}
@@ -3014,7 +3022,7 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  if(document.querySelector('.pef-story-editor'))return;
  const dialog=document.createElement('dialog');
  dialog.className='pef-story-editor';
- dialog.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Story preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div></div><div class="pef-story-settings"><label>Photo <select data-photo></select></label><p>Drag text or the logo on the preview to move it.</p><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white">White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download Story</button><button type="button" data-share hidden>Share Story</button><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
+ dialog.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Story preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div><div class="pef-story-selection" hidden></div><div class="pef-story-quick" hidden><input data-quick-text aria-label="Edit selected text" maxlength="160"><div><input type="color" data-quick-color aria-label="Text color"><button type="button" data-quick-bg>Background</button><button type="button" data-quick-shadow>Shadow</button><button type="button" data-quick-done>Done</button></div><input type="range" data-quick-size min="24" max="96" aria-label="Text size"></div></div><div class="pef-story-settings"><label>Photo <select data-photo></select></label><p>Tap a text to edit it. Drag text or the logo to move it.</p><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white">White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download Story</button><button type="button" data-share hidden>Share Story</button><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
  const find=selector=>dialog.querySelector(selector);
  const canvas=find('canvas'),ctx=canvas.getContext('2d');
  const status=find('[role=status]'),photoSelect=find('[data-photo]'), stage=find('.pef-story-stage');
@@ -3035,10 +3043,43 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  const typeface=find('[data-typeface]');
  for(const font of Object.keys(fonts))typeface.add(new Option(font,font));
  typeface.onchange=draw;
- for(const layer of layers)Object.assign(layer,{color:'#ffffff',background:'#222222',pill:false});
+ for(const layer of layers)Object.assign(layer,{color:'#ffffff',background:'#222222',pill:false,shadow:false});
  const logo={x:90,y:225,width:265};
  let logoImage=null,logoVersion=0,image=null,loadVersion=0,drag=null;
- const bounds=new Map();
+ const bounds=new Map(),layerFields=new Map();
+ const quick=find('.pef-story-quick'),selection=find('.pef-story-selection');
+ const quickText=find('[data-quick-text]'),quickColor=find('[data-quick-color]'),quickSize=find('[data-quick-size]');
+ const quickBg=find('[data-quick-bg]'),quickShadow=find('[data-quick-shadow]');
+ let activeLayer=null;
+ function selectLayer(layer){
+  activeLayer=layers.includes(layer)?layer:null;
+  syncQuick();draw();
+ }
+ function syncQuick(){
+  quick.hidden=!activeLayer;
+  if(!activeLayer)return;
+  quickText.value=activeLayer.text;
+  quickColor.value=activeLayer.color;
+  quickSize.value=activeLayer.size;
+  quickBg.setAttribute('aria-pressed',String(activeLayer.pill));
+  quickShadow.setAttribute('aria-pressed',String(activeLayer.shadow));
+ }
+ function changeQuick(key,value){
+  if(!activeLayer)return;
+  activeLayer[key]=value;
+  const fields=layerFields.get(activeLayer);
+  if(key==='pill'||key==='shadow')fields[key].checked=value;
+  else fields[key].value=value;
+  fields.backgroundLabel.hidden=!activeLayer.pill;
+  if(key==='pill'||key==='shadow')syncQuick();
+  draw();
+ }
+ quickText.oninput=()=>changeQuick('text',quickText.value);
+ quickColor.oninput=()=>changeQuick('color',quickColor.value);
+ quickSize.oninput=()=>changeQuick('size',Number(quickSize.value));
+ quickBg.onclick=()=>changeQuick('pill',!activeLayer.pill);
+ quickShadow.onclick=()=>changeQuick('shadow',!activeLayer.shadow);
+ find('[data-quick-done]').onclick=()=>selectLayer(null);
  function lines(text,maximum){
   const output=[];
   let line='';
@@ -3077,10 +3118,16 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
    }
    ctx.save();
    ctx.fillStyle=layer.color;
-   if(!layer.pill){ctx.shadowColor='#000a';ctx.shadowBlur=15;ctx.shadowOffsetY=2}
+   if(layer.shadow){ctx.shadowColor='#000a';ctx.shadowBlur=15;ctx.shadowOffsetY=2}
    wrapped.forEach((line,index)=>ctx.fillText(line,layer.x,layer.y+index*lineHeight,max));
    ctx.restore();
    bounds.set(layer,{x:layer.x-18,y:layer.y-12,w:width+36,h:wrapped.length*lineHeight+22});
+  }
+  const selected=bounds.get(activeLayer);
+  selection.hidden=!selected;
+  if(selected){
+   selection.style.left=selected.x/10.8+'%';selection.style.top=selected.y/19.2+'%';
+   selection.style.width=selected.w/10.8+'%';selection.style.height=selected.h/19.2+'%';
   }
  }
  function changePhoto(){
@@ -3115,14 +3162,18 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   const palette=document.createElement('div');palette.className='pef-story-palette';
   const backgroundLabel=labelFor('Background color',background);backgroundLabel.hidden=!layer.pill;
   palette.append(labelFor('Text color',color),backgroundLabel);
-  color.oninput=()=>{layer.color=color.value;draw()};
+  color.oninput=()=>{layer.color=color.value;if(activeLayer===layer)syncQuick();draw()};
   background.oninput=()=>{layer.background=background.value;draw()};
-  pill.onchange=()=>{layer.pill=pill.checked;backgroundLabel.hidden=!layer.pill;draw()};
-  controls.append(text,labelFor('Size',size),pillLabel,palette);
+  pill.onchange=()=>{layer.pill=pill.checked;backgroundLabel.hidden=!layer.pill;if(activeLayer===layer)syncQuick();draw()};
+  const shadow=document.createElement('input');shadow.type='checkbox';shadow.checked=layer.shadow;
+  const shadowLabel=labelFor('Drop shadow',shadow);shadowLabel.className='pef-story-switch';
+  shadow.onchange=()=>{layer.shadow=shadow.checked;if(activeLayer===layer)syncQuick();draw()};
+  layerFields.set(layer,{text,size,color,pill,shadow,backgroundLabel});
+  controls.append(text,labelFor('Size',size),pillLabel,shadowLabel,palette);
   function sync(){controls.hidden=!layer.visible;draw()}
-  toggle.onchange=()=>{layer.visible=toggle.checked;sync()};
-  text.oninput=()=>{layer.text=text.value;draw()};
-  size.oninput=()=>{layer.size=Number(size.value);draw()};
+  toggle.onchange=()=>{layer.visible=toggle.checked;if(!layer.visible&&activeLayer===layer)selectLayer(null);sync()};
+  text.oninput=()=>{layer.text=text.value;if(activeLayer===layer)syncQuick();draw()};
+  size.oninput=()=>{layer.size=Number(size.value);if(activeLayer===layer)syncQuick();draw()};
   controls.hidden=!layer.visible;set.append(label,controls);layerList.append(set);
  }
  function point(event){
@@ -3132,19 +3183,27 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  canvas.onpointerdown=event=>{
   const {x,y}=point(event);
   const hit=[...bounds].reverse().find(([,b])=>x>=b.x-24&&x<=b.x+b.w+24&&y>=b.y-24&&y<=b.y+b.h+24);
-  if(!hit||event.button!==0)return;
+  if(event.button!==0)return;
+  if(!hit){selectLayer(null);return}
   const [layer,b]=hit;
-  drag={id:event.pointerId,layer,dx:x-layer.x,dy:y-layer.y,b};
+  drag={id:event.pointerId,layer,dx:x-layer.x,dy:y-layer.y,b,x,y,moved:false};
   canvas.setPointerCapture(event.pointerId);
  };
  canvas.onpointermove=event=>{
   if(event.pointerId!==drag?.id)return;
-  const p=point(event),{layer,dx,dy,b}=drag;
+  const p=point(event),{layer,dx,dy,b,x,y}=drag;
+  if(!drag.moved&&Math.hypot(p.x-x,p.y-y)<16)return;
+  drag.moved=true;
   layer.x=Math.max(36,Math.min(1080-Math.min(b.w,1008)-18,p.x-dx));
   layer.y=Math.max(36,Math.min(1920-b.h-18,p.y-dy));
   draw();
  };
- canvas.onpointerup=canvas.onpointercancel=canvas.onlostpointercapture=()=>{drag=null};
+ canvas.onpointerup=event=>{
+  if(event.pointerId!==drag?.id)return;
+  const {layer,moved}=drag;drag=null;
+  if(!moved)selectLayer(layer);
+ };
+ canvas.onpointercancel=canvas.onlostpointercapture=()=>{drag=null};
  const logoSize=find('[data-logo-size]');
  logoSize.oninput=()=>{logo.width=Number(logoSize.value);draw()};
  find('[data-logo]').onchange=event=>{
