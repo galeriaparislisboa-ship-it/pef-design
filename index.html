@@ -1729,7 +1729,7 @@ document.addEventListener('DOMContentLoaded',()=>{const root=document.getElement
   const b=document.createElement('button'); b.textContent=label; b.disabled=!phone;
   f.append(b); f.onsubmit=e=>{e.preventDefault();message(makeText())};
  }
- function ref(p){return p.name+' · '+p.id}
+ function ref(p){return p.name}
  function thumb(p) {return (p.photos?.[0]||'').replace(/(\/image\/upload\/)(?=v\d+\/)/,'$1w_480,c_limit,q_auto,f_auto/')}
  if(pieces.length) button(actions,'Private tour',()=>panel('Private tour',f=>{
   const tour=pieces.slice(0,5); let i=0;
@@ -1760,7 +1760,13 @@ document.addEventListener('DOMContentLoaded',()=>{const root=document.getElement
  }));
  if(pieces.length)button(actions,'Book a viewing',()=>panel('Book a viewing',f=>{
   const s=choose(f),date=field(f,'Preferred Lisbon date and time','datetime-local');
-  submit(f,'Request a viewing',()=> 'Hello, could I view '+ref(pieces[s.value])+' on '+date.value.replace('T',' ')+' (Lisbon time)?')
+  submit(f,'Request a viewing',()=>{
+   // The form collects Lisbon wall time. Format its fields without shifting them to the visitor's timezone.
+   const selectedTime=new Date(date.value+'Z');
+   const day=new Intl.DateTimeFormat('en-GB',{dateStyle:'long',timeZone:'UTC'}).format(selectedTime);
+   const time=new Intl.DateTimeFormat('en-GB',{timeStyle:'short',timeZone:'UTC'}).format(selectedTime);
+   return 'Hello, could I arrange a viewing for “'+ref(pieces[s.value])+'” on '+day+' at '+time+' (Lisbon time)? Thank you!';
+  })
  }));
  if(pieces.some(p=>p.photos?.length))button(actions,'See it in my room',()=>panel('See it in my room',(f,d)=>{
   const s=choose(f),file=field(f,'Room photo','file');file.accept='image/*';
