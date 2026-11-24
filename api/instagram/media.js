@@ -1,6 +1,7 @@
 // Server-side, read-only Instagram preview for the gallery's authorized test account.
 // Never return the access token to the browser.
 module.exports = async function handler(req,res) {
+  res.setHeader('Access-Control-Allow-Origin','https://pef-design-migration-preview.galeriaparislisboa.workers.dev');
   res.setHeader('Cache-Control','public, s-maxage=300, stale-while-revalidate=600');
   if(req.method!=='GET') return res.status(405).json({error:'Method not allowed'});
   const token=(process.env.INSTAGRAM_ACCESS_TOKEN||'').trim();
