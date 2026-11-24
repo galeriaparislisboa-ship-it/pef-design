@@ -73,7 +73,12 @@ function extract(html,base){
   }
  }
  if(!product&&!gallery&&!meta.get('og:type')?.includes('product'))throw Error('Enter a product page URL.');
- const title=plain(product?.name||meta.get('og:title')?.[0]||html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]);
+ const headings=[...html.matchAll(/<h1\b([^>]*)>([\s\S]*?)<\/h1>/gi)];
+ const productHeading=headings.find(([,attributes])=>/product[-_ ]?(?:item[-_ ]?)?title/i.test(attributes));
+ const genericTitle=/^Art, design and bespoke creations|^Galeria Paris Lisboa\s*[–—-]/i;
+ const visibleHeading=headings.map(([, ,value])=>plain(value)).find(value=>value&&!genericTitle.test(value));
+ const slug=decodeURIComponent(base.pathname.split('/').filter(Boolean).at(-1)||'').replace(/-/g,' ');
+ const title=[productHeading?.[2],product?.name,visibleHeading,meta.get('og:title')?.[0],slug].map(plain).find(value=>value&&!genericTitle.test(value));
  if(!title||!links.size)throw Error('No product title and photos were found.');
  return {title,description:plain(product?.description||meta.get('og:description')?.[0]||meta.get('description')?.[0]),photos:[...links.values()].slice(0,5)};
 }
