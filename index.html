@@ -3030,8 +3030,8 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  const photos=(Array.isArray(row.photos)?row.photos:[]).filter(url=>typeof url==='string'&&url.startsWith('https://'));
  const layers=[
   {name:'Title',text:row.title||'',visible:true,size:62,x:90,y:1370},
-  {name:'Description',text:row.description||'',visible:false,size:38,x:90,y:1540},
-  {name:'Price',text:row.price!=null?row.price+' €':'',visible:false,size:44,x:90,y:1700},
+  {name:'Description',text:row.description||'',visible:Boolean(row.description?.trim()),size:38,x:90,y:1540},
+  {name:'Price',text:row.price!=null?row.price+' €':'',visible:row.price!=null&&String(row.price).trim()!=='',size:44,x:90,y:1700},
  ];
  const fonts={
   'Modern':'system-ui,sans-serif',
@@ -3091,6 +3091,21 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   if(line)output.push(line);
   return output.slice(0,3);
  }
+ function storyFont(layer){
+  return (layer.name==='Title'?'600 ':'500 ')+layer.size+'px '+fonts[typeface.value];
+ }
+ function positionInitialText(){
+  const left=90;
+  let bottom=1710;
+  for(const layer of [...layers].reverse()){
+   layer.x=left;
+   if(!layer.visible||!layer.text.trim())continue;
+   ctx.font=storyFont(layer);
+   const height=lines(layer.text,1080-left-60).length*Math.round(layer.size*1.18);
+   layer.y=bottom-height;
+   bottom=layer.y-38;
+  }
+ }
  function draw(){
   ctx.fillStyle='#151515';ctx.fillRect(0,0,1080,1920);
   if(image){
@@ -3107,7 +3122,8 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   }
   for(const layer of layers){
    if(!layer.visible||!layer.text.trim())continue;
-   ctx.font=(layer.name==='Title'?'600 ':'500 ')+layer.size+'px '+fonts[typeface.value];
+   ctx.font=storyFont(layer);
+   ctx.textAlign='left';
    ctx.textBaseline='top';
    const max=Math.max(110,1080-layer.x-60);
    const wrapped=lines(layer.text,max),lineHeight=Math.round(layer.size*1.18);
@@ -3254,7 +3270,7 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  };
  find('[data-close]').onclick=()=>dialog.close();
  dialog.onclose=()=>{loadVersion++;logoVersion++;dialog.remove()};
- document.body.append(dialog);dialog.showModal();changePhoto();
+ positionInitialText();document.body.append(dialog);dialog.showModal();changePhoto();
 }
 if(new URL(location.href).searchParams.get('story')==='preview'){
  pefFetchCloudflareListings().then(rows=>{
