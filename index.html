@@ -933,6 +933,7 @@ transform:none!important;
 .app>.top .top-beta{display:block;margin-top:2px;font-size:10px;line-height:1;color:#4199d4}
 @media(max-width:799px){.app>.top{padding-block:calc(8px + env(safe-area-inset-top,0px)) 8px!important}}
 </style><style>.pef-story-editor{width:min(94vw,760px);max-height:88dvh;padding:18px;border:1px solid #d0d0d0;border-radius:22px;background:#f5f5f5;color:#222;box-sizing:border-box;overflow:auto;font:14px/1.4 system-ui}
+.pef-story-chooser{max-width:420px}
 .pef-story-editor::backdrop{background:#000b}
 .pef-story-editor header,.pef-story-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pef-story-editor header{margin-bottom:14px}
@@ -1407,6 +1408,10 @@ async function openPEFPublicSeller(sellerId){
 }
 function renderPEFPublicSeller(sellerId,settings){if(!sellerId||(!pefSellerNames[sellerId]&&(!pefSellerBadges[sellerId]||pefSellerBadges[sellerId]==='none')))return;const name=pefSellerNames[sellerId]||'Verified seller';const badge=pefBadgeLabels[pefSellerBadges[sellerId]]||'✓ Verified seller';const listings=items.filter(x=>String(x.sellerId)===String(sellerId)&&x.remote&&(x.photos?.length||x.url));const sold=listings.filter(x=>x.listingStatus==='sold').length;const root=document.getElementById('pefPublicSellerContent');root.dataset.sellerId=String(sellerId);const place=listings.find(x=>x.city||x.country);const locationLabel=[place?.city,place?.country].filter(Boolean).join(', ');const contact=listings.find(x=>x.phone);const contactDigits=String(contact?.phone||'').replace(/\D/g,'');const isFollowing=false;root.innerHTML=`<div class="pef-public-heading"><div class="pef-public-identity"><div class="pef-public-avatar" id="pefPublicAvatar" aria-label="Seller profile photo"><span>✦</span></div><div class="pef-public-identity-text"><span class="pef-public-badge">${escapeHTML(badge)}</span><h1>${escapeHTML(name)}</h1><div class="pef-public-meta"><span class="pef-meta-entry"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7l9-5Z"/><path d="m3 7 9 5 9-5M12 12v10"/></svg><span>${listings.length} objects${sold>=3?' · '+sold+' sold':''}</span></span>${locationLabel?`<span class="pef-meta-entry pef-seller-location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.6"/></svg><span>${escapeHTML(locationLabel)}</span></span>`:''}</div>${String(sellerId)==='f81528f3-3c3c-4590-9ee9-543f950b6884'?`<a class="pef-seller-website" href="https://www.galeriaparislisboa.com/" target="_blank" rel="noopener noreferrer">Visit website</a>`:''}</div></div><div class="pef-public-buttons"><button type="button" class="pef-public-share" onclick="sharePEFPublicSeller('${sellerId}')" aria-label="Share seller page"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7.5 7.5M12 3l4.5 4.5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg><span>Share profile</span></button><div class="pef-seller-actions"><button type="button" class="pef-subscribe-button" onclick="togglePEFSellerFollow('${sellerId}')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M19 8v6m-3-3h6"/></svg><span>Subscribe</span></button>${contactDigits?`<a href="https://wa.me/${contactDigits}?text=${encodeURIComponent('Hello, I discovered your profile on PEF Design.')}" target="_blank" rel="noopener noreferrer">Contact via WhatsApp</a>`:''}</div></div></div><div class="pef-public-grid">${listings.map((x,cardIndex)=>{const itemIndex=items.findIndex(v=>String(v.id)===String(x.id));const liked=itemIndex>=0&&favs.has(String(x.id));return `<article class="pef-public-object" data-object-id="${escapeHTML(String(x.id))}"><button type="button" class="pef-public-cover" onclick="openPEFPublicObject('${x.id}')" aria-label="View ${escapeHTML(x.name)}">${x.photos?.length?`<img src="${escapeHTML(x.photos[0].replace(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(?=v\d+\/)/,'$1w_480,c_limit,q_auto,f_auto/'))}" data-original="${escapeHTML(x.photos[0])}" onerror="this.onerror=null;this.src=this.dataset.original" loading="${cardIndex<2?'eager':'lazy'}" decoding="async" alt="${escapeHTML(x.name)}">`:x.url?`<img src="${escapeHTML(pefPoster(x.url))}" loading="lazy" alt="${escapeHTML(x.name)}" onerror="pefPosterFallback(this)">`:''}</button><div class="pef-public-image-caption"><span class="pef-public-object-name">${escapeHTML(x.name)}</span><span class="pef-public-object-price">${escapeHTML(String(x.price))} € ${x.listingStatus==='sold'?'· SOLD':x.listingStatus==='reserved'?'· RESERVED':''}</span>${x.city?`<span class="pef-public-location">⌖ ${escapeHTML(x.city)}${x.country?', '+escapeHTML(x.country):''}</span>`:''}</div><div class="pef-public-feed-actions"><button type="button" aria-label="Like" onclick="pefPublicCardLike('${x.id}')"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="${liked?'fill:white':'fill:none'}"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg><small>${Number(x.likes||0)}</small></button><button type="button" aria-label="Share" onclick="pefPublicCardShare('${x.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7 8m5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button>${x.phone?`<button type="button" aria-label="Contact via WhatsApp" onclick="pefPublicCardContact('${x.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.5a8.2 8.2 0 0 1-12 7.3L3 20l1.5-5a8.2 8.2 0 1 1 15.7-3.5Z"/><path d="M8.6 8.4c.2-.3.5-.4.8-.2l1.2 1.4-.7 1.1c.8 1.5 1.8 2.5 3.4 3.3l1-.8 1.6 1.2c.3.3.2.6-.1.9-.7.8-1.8.9-2.7.5-2.5-1.1-4.5-3.1-5.5-5.5-.4-.9-.2-1.5 1-1.9Z"/></svg></button>`:''}</div></article>`}).join('')}</div>`;show('sellerPublic');pefPreparePublicVideos();pefRefreshPublicSellerDetails(sellerId);if(settings?.bio){const bio=document.createElement('p');bio.textContent=settings.bio;root.querySelector('.pef-public-heading')?.append(bio)}
  if(settings?.avatar){const target=root.querySelector('#pefPublicAvatar');if(target){const img=document.createElement('img');img.src=settings.avatar;img.alt='Gallery profile photo';target.replaceChildren(img)}}
+ const storyRows=listings.filter(item=>item.photos?.length).map(item=>({
+  id:item.id,seller_id:item.sellerId,title:item.name,description:item.description,price:item.price,photos:item.photos,
+ }));
+ if(storyRows.length)root.querySelector('.pef-seller-actions').append(pefStoryShortcut(storyRows));
  mountGalleryServices(root,listings,contactDigits,settings?.services);pefLoadPublicInstagram(sellerId)}
 function pefPublicCardIndex(id){return items.findIndex(x=>String(x.id)===String(id))}
 function pefPublicCardLike(id){const i=pefPublicCardIndex(id);if(i<0)return;like(i);const card=document.querySelector('#sellerPublic .pef-public-object[data-object-id="'+CSS.escape(String(id))+'"]');const b=card?.querySelector('.pef-public-feed-actions button');if(b)b.innerHTML=(favs.has(String(items[i].id))?'♥':'♡')+' <small>'+Number(items[i].likes||0)+'</small>'}
@@ -1983,7 +1988,9 @@ async function openCloudflareProfile(token){
   const website=document.createElement('a');website.href='https://www.galeriaparislisboa.com/';website.textContent='Visit website';website.target='_blank';website.rel='noopener';
   const newsletter=document.createElement('button');newsletter.type='button';newsletter.textContent='Create a newsletter';newsletter.onclick=()=>openPefNewsletter(token);
   const post=document.createElement('button');post.type='button';post.textContent='New listing';post.onclick=()=>show('create');
-  info.append(h,location,website,view,share,newsletter,post);editGallerySettings(info,headers).catch(e=>{const note=document.createElement('p');note.textContent=e.message;info.append(note)});
+  const story=pefStoryShortcut([]);
+  story.id='pefGalleryStoryShortcut';
+  info.append(h,location,website,view,share,newsletter,post,story);editGallerySettings(info,headers).catch(e=>{const note=document.createElement('p');note.textContent=e.message;info.append(note)});
   const ig=document.createElement('div');ig.className='cf-gallery-info';const igTitle=document.createElement('h3');igTitle.textContent='Instagram';
   const igLink=document.createElement('a');igLink.href='https://www.instagram.com/galerie_paris_lisbon/';igLink.textContent='@galerie_paris_lisbon';igLink.target='_blank';igLink.rel='noopener';
   const igStatus=document.createElement('p');igStatus.setAttribute('role','status');
@@ -2019,6 +2026,11 @@ async function openCloudflareProfile(token){
   if(feed.status===501)feed=await fetch(api+'/api/text-listings');
   if(!feed.ok)throw Error('Could not load listings.');
   const {listings}=await feed.json();
+  if(account.role==='gallery'){
+   const listingOwner=account.userId||'f81528f3-3c3c-4590-9ee9-543f950b6884';
+   const eligible=listings.filter(item=>item.seller_id===listingOwner&&!Number(item.is_hidden)&&item.photos?.length);
+   document.getElementById('pefGalleryStoryShortcut')?.replaceWith(pefStoryShortcut(eligible));
+  }
   for(const item of listings){
    if(item.seller_id!==(account.userId||(account.role==='gallery'?'f81528f3-3c3c-4590-9ee9-543f950b6884':null)))continue;
    if(account.role==='gallery'){list.append(fridayGalleryListing(item,api,headers,list));continue}
@@ -3018,11 +3030,28 @@ function openPefNewsletter(token){
 const pefNewsletterRoute=new URL(location.href).searchParams.get('newsletter');
 if(pefNewsletterRoute==='preview')openPefNewsletter();
 else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewsletter(pefNewsletterRoute);
-</script><script>function openPefStory(row){
+</script><script>function pefStoryShortcut(rows){
+ const button=document.createElement('button');
+ button.type='button';button.textContent='Create a Story';button.hidden=!rows.length;
+ button.onclick=()=>{
+  if(rows.length===1){openPefStory(rows[0]);return}
+  const chooser=document.createElement('dialog');
+  chooser.className='pef-story-editor pef-story-chooser';
+  chooser.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-settings"><label>Listing <select></select></label><div class="pef-story-actions"><button type="button" data-open>Open editor</button></div></div>';
+  const select=chooser.querySelector('select');
+  rows.forEach((row,index)=>select.add(new Option(row.title||'Untitled',index)));
+  chooser.querySelector('[data-close]').onclick=()=>chooser.close();
+  chooser.querySelector('[data-open]').onclick=()=>{chooser.close();openPefStory(rows[Number(select.value)])};
+  chooser.onclose=()=>chooser.remove();
+  document.body.append(chooser);chooser.showModal();
+ };
+ return button;
+}
+function openPefStory(row){
  if(document.querySelector('.pef-story-editor'))return;
  const dialog=document.createElement('dialog');
  dialog.className='pef-story-editor';
- dialog.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Story preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div><div class="pef-story-selection" hidden></div><div class="pef-story-quick" hidden><input data-quick-text aria-label="Edit selected text" maxlength="160"><div><input type="color" data-quick-color aria-label="Text color"><button type="button" data-quick-bg>Background</button><button type="button" data-quick-shadow>Shadow</button><button type="button" data-quick-done>Done</button></div><input type="range" data-quick-size min="24" max="96" aria-label="Text size"></div></div><div class="pef-story-settings"><label>Photo <select data-photo></select></label><p>Tap a text to edit it. Drag text or the logo to move it.</p><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white">White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download Story</button><button type="button" data-share hidden>Share Story</button><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
+ dialog.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Story preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div><div class="pef-story-selection" hidden></div><div class="pef-story-quick" hidden><input data-quick-text aria-label="Edit selected text" maxlength="160"><div><input type="color" data-quick-color aria-label="Text color"><button type="button" data-quick-bg>Background</button><button type="button" data-quick-shadow>Shadow</button><button type="button" data-quick-done>Done</button></div><input type="range" data-quick-size min="24" max="96" aria-label="Text size"></div></div><div class="pef-story-settings"><label>Photo <select data-photo></select></label><p>Tap a text to edit it. Drag text or the logo to move it.</p><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white" selected>White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download Story</button><button type="button" data-share hidden>Share Story</button><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
  const find=selector=>dialog.querySelector(selector);
  const canvas=find('canvas'),ctx=canvas.getContext('2d');
  const status=find('[role=status]'),photoSelect=find('[data-photo]'), stage=find('.pef-story-stage');
@@ -3044,7 +3073,7 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  for(const font of Object.keys(fonts))typeface.add(new Option(font,font));
  typeface.onchange=draw;
  for(const layer of layers)Object.assign(layer,{color:'#ffffff',background:'#222222',pill:false,shadow:false});
- const storyLeftMargin=1080*.05;
+ const frameMargin=44,storyLeftMargin=96;
  const logo={x:storyLeftMargin,y:225,width:265};
  let logoImage=null,logoVersion=0,image=null,loadVersion=0,drag=null;
  const bounds=new Map(),layerFields=new Map();
@@ -3096,20 +3125,22 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   return (layer.name==='Title'?'600 ':'500 ')+layer.size+'px '+fonts[typeface.value];
  }
  function positionInitialText(){
-  let bottom=1710;
+  let bottom=1650;
   for(const layer of [...layers].reverse()){
    layer.x=storyLeftMargin;
    if(!layer.visible||!layer.text.trim())continue;
    ctx.font=storyFont(layer);
-   const height=lines(layer.text,1080-storyLeftMargin-60).length*Math.round(layer.size*1.18);
+   const height=lines(layer.text,1080-storyLeftMargin-96).length*Math.round(layer.size*1.18);
    layer.y=bottom-height;
    bottom=layer.y-38;
   }
  }
  function draw(){
-  ctx.fillStyle='#151515';ctx.fillRect(0,0,1080,1920);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,1080,1920);
+  ctx.fillStyle='#151515';ctx.fillRect(frameMargin,frameMargin,1080-2*frameMargin,1920-2*frameMargin);
+  ctx.save();ctx.beginPath();ctx.rect(frameMargin,frameMargin,1080-2*frameMargin,1920-2*frameMargin);ctx.clip();
   if(image){
-   const scale=Math.min(1080/image.naturalWidth,1920/image.naturalHeight);
+   const scale=Math.min((1080-2*frameMargin)/image.naturalWidth,(1920-2*frameMargin)/image.naturalHeight);
    const w=image.naturalWidth*scale,h=image.naturalHeight*scale;
    ctx.drawImage(image,(1080-w)/2,(1920-h)/2,w,h);
   }
@@ -3125,7 +3156,7 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
    ctx.font=storyFont(layer);
    ctx.textAlign='left';
    ctx.textBaseline='top';
-   const max=Math.max(110,1080-layer.x-60);
+   const max=Math.max(110,1080-layer.x-96);
    const wrapped=lines(layer.text,max),lineHeight=Math.round(layer.size*1.18);
    const width=Math.min(max,Math.max(...wrapped.map(line=>ctx.measureText(line).width)));
    if(layer.pill){
@@ -3139,6 +3170,7 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
    ctx.restore();
    bounds.set(layer,{x:layer.x-18,y:layer.y-12,w:width+36,h:wrapped.length*lineHeight+22});
   }
+  ctx.restore();
   const selected=bounds.get(activeLayer);
   selection.hidden=!selected;
   if(selected){
@@ -3210,8 +3242,8 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   const p=point(event),{layer,dx,dy,b,x,y}=drag;
   if(!drag.moved&&Math.hypot(p.x-x,p.y-y)<16)return;
   drag.moved=true;
-  layer.x=Math.max(36,Math.min(1080-Math.min(b.w,1008)-18,p.x-dx));
-  layer.y=Math.max(36,Math.min(1920-b.h-18,p.y-dy));
+  layer.x=Math.max(frameMargin+18,Math.min(Math.max(frameMargin+18,1080-b.w-frameMargin),p.x-dx));
+  layer.y=Math.max(frameMargin+12,Math.min(1920-b.h-frameMargin,p.y-dy));
   draw();
  };
  canvas.onpointerup=event=>{
@@ -3222,18 +3254,22 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  canvas.onpointercancel=canvas.onlostpointercapture=()=>{drag=null};
  const logoSize=find('[data-logo-size]');
  logoSize.oninput=()=>{logo.width=Number(logoSize.value);draw()};
- find('[data-logo]').onchange=event=>{
-  const version=++logoVersion,variant=event.target.value;
-  logoImage=null;draw();
+ const logoChoice=find('[data-logo]');
+ let logoReady=Promise.resolve();
+ logoChoice.onchange=()=>{
+  const version=++logoVersion,variant=logoChoice.value;
+  logoReady=Promise.resolve();logoImage=null;draw();
   find('[data-logo-size-row]').hidden=!variant;
   if(!['black','white'].includes(variant))return;
   const candidate=new Image();
-  candidate.onload=()=>{if(version===logoVersion){logoImage=candidate;draw()}};
-  candidate.onerror=()=>{if(version===logoVersion)status.textContent='The PEF logo could not be loaded.'};
-  candidate.src='/pef-V3-'+variant+'.png';
+  logoReady=new Promise(resolve=>{
+   candidate.onload=()=>{if(version===logoVersion){logoImage=candidate;draw()}resolve()};
+   candidate.onerror=()=>{if(version===logoVersion)status.textContent='The PEF logo could not be loaded.';resolve()};
+   candidate.src='/pef-V3-'+variant+'.png';
+  });
  };
  find('[data-guides]').onchange=event=>{stage.querySelector('.pef-story-guides').hidden=!event.target.checked};
- const getStoryFile=()=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(new File([blob],'pef-story.jpg',{type:'image/jpeg'})):reject(Error('Could not export the Story.')),'image/jpeg',.92));
+ const getStoryFile=async()=>{await logoReady;return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(new File([blob],'pef-story.jpg',{type:'image/jpeg'})):reject(Error('Could not export the Story.')),'image/jpeg',.92))};
  download.onclick=async()=>{
   try{
    const file=await getStoryFile(),url=URL.createObjectURL(file),link=document.createElement('a');
@@ -3270,7 +3306,7 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  };
  find('[data-close]').onclick=()=>dialog.close();
  dialog.onclose=()=>{loadVersion++;logoVersion++;dialog.remove()};
- positionInitialText();document.body.append(dialog);dialog.showModal();changePhoto();
+ positionInitialText();document.body.append(dialog);dialog.showModal();changePhoto();logoChoice.onchange();
 }
 if(new URL(location.href).searchParams.get('story')==='preview'){
  pefFetchCloudflareListings().then(rows=>{
