@@ -835,6 +835,12 @@ transform:none!important;
 .pef-newsletter iframe.pef-newsletter-mobile{max-width:375px}
 .pef-newsletter-actions{justify-content:flex-end;flex-wrap:wrap}
 .pef-newsletter [role=status]{margin-top:8px}
+.pef-newsletter-instagram{margin-top:16px;padding-top:12px;border-top:1px solid #ccc}
+.pef-newsletter-instagram>label{display:flex;align-items:center}
+.pef-newsletter [data-instagram-posts]{display:grid;grid-template-columns:repeat(auto-fill,minmax(65px,1fr));gap:7px;max-height:185px;overflow:auto}
+.pef-newsletter [data-instagram-posts] label{position:relative;margin:0;cursor:pointer}
+.pef-newsletter [data-instagram-posts] input{position:absolute;top:4px;left:4px}
+.pef-newsletter [data-instagram-posts] img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px}
 .pef-newsletter [data-contacts]{margin-top:16px;padding-top:12px;border-top:1px solid #ccc}
 .pef-newsletter [data-contacts] .pef-newsletter-actions{justify-content:flex-start}
 @media(max-width:700px){.pef-newsletter-layout{grid-template-columns:1fr}}
@@ -2380,11 +2386,23 @@ async function mountPefNewsletterContacts(host,token){
  finally{busy=false;sync()}
 }
 
-function pefNewsletterMarkup(subject,intro,pieces,font=pefNewsletterFonts.editorial){
+const pefNewsletterInstagram='https://www.instagram.com/galerie_paris_lisbon/';
+
+function pefNewsletterInstagramRows(posts){
+ const heading=`<tr><td colspan="2" style="padding:20px 8px 12px;border-top:1px solid #ddd"><a href="${pefNewsletterInstagram}" style="color:#222;font-weight:600;text-decoration:none">Suivez-nous sur Instagram →</a></td></tr>`;
+ const rows=[];
+ for(let i=0;i<posts.length;i+=2){
+  const cells=posts.slice(i,i+2).map(post=>`<td class="piece" width="50%" valign="top" style="padding:0 8px 12px"><a href="${escapeHTML(post.permalink)}"><img src="${escapeHTML(post.image)}" width="264" style="display:block;border:0;width:100%;height:auto" alt="Voir la publication Instagram"></a></td>`);
+  rows.push('<tr>'+cells.join('')+(cells.length===1?'<td class="empty" width="50%"></td>':'')+'</tr>');
+ }
+ return heading+rows.join('');
+}
+
+function pefNewsletterMarkup(subject,intro,pieces,font=pefNewsletterFonts.editorial,instagram=null){
  const card=(piece,lead=false)=>`<td class="piece" width="${lead?'100%':'50%'}" valign="top" style="padding:0 8px 22px"><a href="${pefNewsletterLink('listing',piece.id)}" style="color:#212121;text-decoration:none"><img src="${escapeHTML(piece.photos[0])}" alt="${escapeHTML(piece.title)}" width="${lead?544:264}" style="display:block;width:100%;height:auto;border:0"><strong style="display:block;padding-top:8px;font-size:16px">${escapeHTML(piece.title)}</strong></a>${piece.price?'<span style="font-size:14px;color:#555">'+escapeHTML(piece.price)+' €</span>':''}</td>`;
  const rows=pieces.slice(1).reduce((html,piece,i)=>html+(i%2?'':'<tr>')+card(piece)+(i%2?'</tr>':''),'');
  const grid=pieces.length%2===0&&pieces.length>1?rows+'<td class="empty" width="50%"></td></tr>':rows;
- const body=`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff;color:#212121;font-family:${font.body}"><tr><td align="center" style="padding:24px 10px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px"><tr><td colspan="2" style="padding:0 8px 20px"><p style="font-size:12px;letter-spacing:2px;margin:0 0 20px;text-transform:uppercase">Galerie Paris–Lisboa</p><h1 style="font-family:${font.heading};font-size:32px;font-weight:400;margin:0 0 12px">${escapeHTML(subject)}</h1><p style="font-size:16px;line-height:1.55;margin:0">${escapeHTML(intro).replace(/\r?\n/g,'<br>')}</p></td></tr>${pieces.length?'<tr>'+card(pieces[0],true).replace('<td ','<td colspan="2" ')+'</tr>':''}${grid}<tr><td colspan="2" style="padding:10px 8px 16px"><a href="${pefNewsletterLink('seller',pefNewsletterGalleryId)}" style="display:inline-block;background:#242424;color:#fff;text-decoration:none;border-radius:24px;padding:13px 20px;font-size:14px">Explore the gallery →</a></td></tr><tr><td colspan="2" style="padding:6px 8px;font-size:12px;color:#555">Galerie Paris–Lisboa · Pena, Lisbon</td></tr></table></td></tr></table>`;
+ const body=`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff;color:#212121;font-family:${font.body}"><tr><td align="center" style="padding:24px 10px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px"><tr><td colspan="2" style="padding:0 8px 20px"><p style="font-size:12px;letter-spacing:2px;margin:0 0 20px;text-transform:uppercase">Galerie Paris–Lisboa</p><h1 style="font-family:${font.heading};font-size:32px;font-weight:400;margin:0 0 12px">${escapeHTML(subject)}</h1><p style="font-size:16px;line-height:1.55;margin:0">${escapeHTML(intro).replace(/\r?\n/g,'<br>')}</p></td></tr>${pieces.length?'<tr>'+card(pieces[0],true).replace('<td ','<td colspan="2" ')+'</tr>':''}${grid}<tr><td colspan="2" style="padding:10px 8px 16px"><a href="${pefNewsletterLink('seller',pefNewsletterGalleryId)}" style="display:inline-block;background:#242424;color:#fff;text-decoration:none;border-radius:24px;padding:13px 20px;font-size:14px">Explore the gallery →</a></td></tr>${instagram?pefNewsletterInstagramRows(instagram):''}<tr><td colspan="2" style="padding:6px 8px;font-size:12px;color:#555">Galerie Paris–Lisboa · Pena, Lisbon</td></tr></table></td></tr></table>`;
  return {body,document:`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(subject)}</title><style>@media(max-width:480px){.piece{display:block;width:auto}.empty{display:none}}</style></head><body style="margin:0">${body}</body></html>`};
 }
 
@@ -2392,16 +2410,20 @@ function openPefNewsletter(token){
  if(document.querySelector('.pef-newsletter'))return;
  const dialog=document.createElement('dialog');
  dialog.className='pef-newsletter';
- dialog.innerHTML='<header><h1>Create a newsletter</h1><button type="button" data-close>Close</button></header><div class="pef-newsletter-layout"><section><label>Subject <input maxlength="120" value="New pieces from Galerie Paris–Lisboa"></label><label>Introduction <textarea rows="4" maxlength="1200">From our gallery in Lisbon’s Pena district, here are a few pieces we’d love you to discover.</textarea></label><label>Typeface <select data-font></select></label><h2>Select pieces</h2><p>The first selected piece leads the newsletter. Use the arrows to reorder.</p><div data-pieces></div><section data-contacts></section></section><section><div class="pef-newsletter-preview"><h2>Email preview</h2><button type="button" data-mobile aria-pressed="false">Mobile</button></div><iframe title="Newsletter preview" sandbox></iframe><div class="pef-newsletter-actions"><button type="button" data-copy disabled>Copy newsletter</button><button type="button" data-download disabled>Download HTML</button></div></section></div><p role="status"></p>';
+ dialog.innerHTML='<header><h1>Create a newsletter</h1><button type="button" data-close>Close</button></header><div class="pef-newsletter-layout"><section><label>Subject <input maxlength="120" value="New pieces from Galerie Paris–Lisboa"></label><label>Introduction <textarea rows="4" maxlength="1200">From our gallery in Lisbon’s Pena district, here are a few pieces we’d love you to discover.</textarea></label><label>Typeface <select data-font></select></label><h2>Select pieces</h2><p>The first selected piece leads the newsletter. Use the arrows to reorder.</p><div data-pieces></div><section class="pef-newsletter-instagram"><h2>Instagram</h2><label><input type="checkbox" data-instagram-enabled> Include “Suivez-nous sur Instagram”</label><div data-instagram-options hidden><p data-instagram-status role="status"></p><div data-instagram-posts></div></div></section><section data-contacts></section></section><section><div class="pef-newsletter-preview"><h2>Email preview</h2><button type="button" data-mobile aria-pressed="false">Mobile</button></div><iframe title="Newsletter preview" sandbox></iframe><div class="pef-newsletter-actions"><button type="button" data-copy disabled>Copy newsletter</button><button type="button" data-download disabled>Download HTML</button></div></section></div><p role="status"></p>';
  const get=selector=>dialog.querySelector(selector);
- const subject=get('input'),intro=get('textarea'),frame=get('iframe'),list=get('[data-pieces]'),status=get('[role=status]');
+ const subject=get('input'),intro=get('textarea'),frame=get('iframe'),list=get('[data-pieces]'),status=dialog.querySelector(':scope > [role=status]');
+ const instagram=get('[data-instagram-enabled]'),instagramOptions=get('[data-instagram-options]');
+ const instagramStatus=get('[data-instagram-status]'),instagramPosts=get('[data-instagram-posts]');
+ const picks=new Set();
+ let loadingInstagram=false,instagramLoaded=false;
  const copy=get('[data-copy]'),download=get('[data-download]'),mobile=get('[data-mobile]'),font=get('[data-font]');
  for(const [key,style] of Object.entries(pefNewsletterFonts))font.add(new Option(style.label,key));
- const markup=()=>pefNewsletterMarkup(subject.value,intro.value,selected,pefNewsletterFonts[font.value]);
+ const markup=()=>pefNewsletterMarkup(subject.value,intro.value,selected,pefNewsletterFonts[font.value],instagram.checked?[...picks]:null);
  let available=[],selected=[];
  const render=()=>{
   frame.srcdoc=markup().document;
-  copy.disabled=download.disabled=!selected.length||!subject.value.trim();
+  copy.disabled=download.disabled=(!selected.length&&!instagram.checked)||!subject.value.trim();
  };
  function renderPieces(){
   list.replaceChildren();
@@ -2426,6 +2448,29 @@ function openPefNewsletter(token){
    list.append(row);
   }
  }
+ instagram.onchange=async()=>{
+  instagramOptions.hidden=!instagram.checked;
+  render();
+  if(!instagram.checked||instagramLoaded||loadingInstagram)return;
+  loadingInstagram=true;
+  instagramStatus.textContent='Loading Instagram posts…';
+  try{
+   const response=await fetch('/api/instagram/media');
+   if(!response.ok)throw Error();
+   const {media}=await response.json();
+   const posts=(media||[]).filter(post=>/^https:\/\//i.test(post.image)&&/^https:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv)\/[a-z0-9_-]+(?:[/?#]|$)/i.test(post.permalink)&&!(post.type==='VIDEO'&&post.image===post.video));
+   instagramStatus.textContent=posts.length?'Select the posts to include.':'No posts with thumbnails are available.';
+   for(const [index,post] of posts.entries()){
+    const label=document.createElement('label'),check=document.createElement('input'),image=document.createElement('img');
+    check.type='checkbox';check.setAttribute('aria-label','Instagram post '+(index+1));
+    image.src=post.image;image.alt='';image.loading='lazy';
+    check.onchange=()=>{if(check.checked)picks.add(post);else picks.delete(post);render()};
+    label.append(check,image);instagramPosts.append(label);
+   }
+   instagramLoaded=true;
+  }catch{instagramStatus.textContent='Instagram posts are unavailable. The follow link can still be included.'}
+  finally{loadingInstagram=false}
+ };
  subject.oninput=intro.oninput=render;
  font.onchange=render;
  mobile.onclick=()=>mobile.setAttribute('aria-pressed',String(frame.classList.toggle('pef-newsletter-mobile')));
@@ -2434,7 +2479,7 @@ function openPefNewsletter(token){
  copy.onclick=async()=>{
   try{
    const html=markup().body;
-   await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([subject.value+'\n\n'+intro.value+'\n\n'+selected.map(x=>x.title+' '+pefNewsletterLink('listing',x.id)).join('\n')+'\n\n'+pefNewsletterLink('seller',pefNewsletterGalleryId)],{type:'text/plain'})})]);
+   await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([subject.value+'\n\n'+intro.value+'\n\n'+selected.map(x=>x.title+' '+pefNewsletterLink('listing',x.id)).join('\n')+'\n\n'+pefNewsletterLink('seller',pefNewsletterGalleryId)+(instagram.checked?'\n\nSuivez-nous sur Instagram '+pefNewsletterInstagram+'\n'+[...picks].map(post=>post.permalink).join('\n'):'')],{type:'text/plain'})})]);
    status.textContent='Newsletter copied. Paste it into your email editor.';
   }catch{status.textContent='Copy is unavailable in this browser. Use Download HTML.'}
  };
