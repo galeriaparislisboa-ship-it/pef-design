@@ -3044,7 +3044,8 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
  for(const font of Object.keys(fonts))typeface.add(new Option(font,font));
  typeface.onchange=draw;
  for(const layer of layers)Object.assign(layer,{color:'#ffffff',background:'#222222',pill:false,shadow:false});
- const logo={x:90,y:225,width:265};
+ const storyLeftMargin=1080*.05;
+ const logo={x:storyLeftMargin,y:225,width:265};
  let logoImage=null,logoVersion=0,image=null,loadVersion=0,drag=null;
  const bounds=new Map(),layerFields=new Map();
  const quick=find('.pef-story-quick'),selection=find('.pef-story-selection');
@@ -3095,13 +3096,12 @@ else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewslett
   return (layer.name==='Title'?'600 ':'500 ')+layer.size+'px '+fonts[typeface.value];
  }
  function positionInitialText(){
-  const left=90;
   let bottom=1710;
   for(const layer of [...layers].reverse()){
-   layer.x=left;
+   layer.x=storyLeftMargin;
    if(!layer.visible||!layer.text.trim())continue;
    ctx.font=storyFont(layer);
-   const height=lines(layer.text,1080-left-60).length*Math.round(layer.size*1.18);
+   const height=lines(layer.text,1080-storyLeftMargin-60).length*Math.round(layer.size*1.18);
    layer.y=bottom-height;
    bottom=layer.y-38;
   }
