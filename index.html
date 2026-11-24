@@ -832,15 +832,20 @@ function pefVideoPosterUrl(url){
  if(!/\.(?:mov|mp4|m4v)(?:\?.*)?$/i.test(asset))return '';
  return parts[0]+'/video/upload/so_0.5,c_limit,w_720,q_auto:eco,f_jpg/'+asset.replace(/\.(?:mov|mp4|m4v)(?=\?|$)/i,'.jpg');
 }
+function pefMobileMedia(url, type){
+ if(typeof url!=='string'||!url.startsWith('https://res.cloudinary.com/'))return url;
+ if(type==='image')return url.replace(/(\/image\/upload\/)(?=v\d+\/)/,'$1w_900,c_limit,q_auto,f_auto/');
+ return url.replace(/(\/video\/upload\/)(?:((?:so_[\d.]+,)?du_10),[^/]+\/)?(?=v\d+\/)/,(_,base,trim)=>base+(trim||'du_10')+',c_limit,w_720,q_auto:good,br_1200k,f_mp4,vc_h264,ac_aac/').replace(/\.mov$/i,'.mp4');
+}
 function pefFeedMedia(x){
  const photos=Array.isArray(x.photos)?x.photos:[];
  const keys=photos.map((_,i)=>'photo:'+i);if(x.url)keys.push('video');
  let order=keys.filter(k=>k!=='video');if(x.url)order.splice(Math.min(1,order.length),0,'video');
- if(order.length===1&&order[0]==='video')return '<video class="pef-video-only" data-pef-rotation="'+(x.videoRotation||0)+'" data-src="'+escapeHTML(x.url)+'" poster="'+escapeHTML(pefVideoPosterUrl(x.url))+'" playsinline loop muted preload="none" aria-label="Tap to play video" style="cursor:pointer"></video>';
+ if(order.length===1&&order[0]==='video')return '<video class="pef-video-only" data-pef-rotation="'+(x.videoRotation||0)+'" data-src="'+escapeHTML(pefMobileMedia(x.url,'video'))+'" data-original="'+escapeHTML(x.url)+'" onerror="if(this.currentSrc && this.src!==this.dataset.original){this.dataset.src=this.dataset.original;this.src=this.dataset.original}" poster="'+escapeHTML(pefVideoPosterUrl(x.url))+'" playsinline loop muted preload="none" aria-label="Tap to play video" style="cursor:pointer"></video>';
  if(!order.length)return x.image?'<img class="inspiration-image" src="'+escapeHTML(x.image)+'" alt="'+escapeHTML(x.name)+'" loading="lazy">':'<div class="placeholder">✦</div>';
  return '<div class="pef-photo-carousel pef-mixed-carousel" aria-label="Media for '+escapeHTML(x.name)+'">'+order.map((key,i)=>{
- if(key==='video')return '<div class="pef-photo-slide pef-video-slide"><video data-pef-rotation="'+(x.videoRotation||0)+'" data-src="'+escapeHTML(x.url)+'" playsinline loop muted preload="none"></video></div>';
- const url=photos[Number(key.slice(6))];return '<div class="pef-photo-slide"><div class="pef-photo-blur" style="background-image:url(&quot;'+escapeHTML(url)+'&quot;)" aria-hidden="true"></div><img src="'+escapeHTML(url)+'" alt="'+escapeHTML(x.name)+' photo '+(Number(key.slice(6))+1)+'" loading="lazy"></div>'
+ if(key==='video')return '<div class="pef-photo-slide pef-video-slide"><video data-pef-rotation="'+(x.videoRotation||0)+'" data-src="'+escapeHTML(pefMobileMedia(x.url,'video'))+'" data-original="'+escapeHTML(x.url)+'" onerror="if(this.currentSrc && this.src!==this.dataset.original){this.dataset.src=this.dataset.original;this.src=this.dataset.original}" playsinline loop muted preload="none"></video></div>';
+ const original=photos[Number(key.slice(6))],url=pefMobileMedia(original,'image');return '<div class="pef-photo-slide"><div class="pef-photo-blur" aria-hidden="true"></div><img src="'+escapeHTML(url)+'" decoding="async" data-original="'+escapeHTML(original)+'" onerror="this.onerror=null;this.src=this.dataset.original" onload="this.previousElementSibling.style.backgroundImage=\'url(\'+JSON.stringify(this.currentSrc)+\')\'" alt="'+escapeHTML(x.name)+' photo '+(Number(key.slice(6))+1)+'" loading="lazy"></div>'
  }).join('')+'</div><div class="pef-photo-dots">'+order.map((_,i)=>'<span class="'+(i===0?'active':'')+'"></span>').join('')+'</div>';
 }
 function pefApplyVideoOrientations(){document.querySelectorAll('#feed video[data-pef-rotation]').forEach(v=>{const angle=Number(v.dataset.pefRotation)||0;if(!angle){v.style.removeProperty('transform');return}const host=v.parentElement;if(!host)return;const apply=()=>{const b=host.getBoundingClientRect();if(!b.width||!b.height)return;v.style.setProperty('position','absolute','important');v.style.setProperty('left','50%','important');v.style.setProperty('top','50%','important');v.style.setProperty('inset','auto','important');v.style.setProperty('width',(angle%180?b.height:b.width)+'px','important');v.style.setProperty('height',(angle%180?b.width:b.height)+'px','important');v.style.setProperty('max-width','none','important');v.style.setProperty('max-height','none','important');v.style.setProperty('object-fit','contain','important');v.style.setProperty('transform','translate(-50%,-50%) rotate('+angle+'deg)','important')};apply();if(!v.dataset.pefRotationReady){v.dataset.pefRotationReady='1';v.addEventListener('loadedmetadata',apply,{once:true})}})}
