@@ -1271,7 +1271,7 @@ async function openCloudflareProfile(token){
  if(!panel){panel=document.createElement('section');panel.id='pefCloudflareProfile';panel.className='card';host.prepend(panel)}
  panel.replaceChildren();
  const title=document.createElement('h2');
- title.textContent=account.role==='gallery'?'Galerie Paris–Lisboa':'PEF Administration';
+ title.textContent=account.role==='gallery'?'Galerie Paris–Lisboa':account.role==='admin'?'PEF Administration':'My listings';
  const email=document.createElement('p');email.textContent=account.email;
  const logout=document.createElement('button');logout.textContent='Sign out';
  logout.onclick=()=>{sessionStorage.removeItem('pefCloudflareSession');location.reload()};
@@ -1285,7 +1285,7 @@ async function openCloudflareProfile(token){
   if(!feed.ok)throw Error('Could not load listings.');
   const {listings}=await feed.json();
   for(const item of listings){
-   if(account.role==='gallery'&&item.seller_id!=='f81528f3-3c3c-4590-9ee9-543f950b6884')continue;
+   if(account.role!=='admin'&&item.seller_id!==(account.userId||(account.role==='gallery'?'f81528f3-3c3c-4590-9ee9-543f950b6884':null)))continue;
    const row=document.createElement('p'),label=document.createElement('label'),select=document.createElement('select');
    label.textContent=item.title+' ';
    for(const status of ['available','reserved','sold'])select.add(new Option(status,status));
