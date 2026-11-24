@@ -1,4 +1,4 @@
-// PEF Design beta: isolated Google OAuth flow. Not wired into the public worker.
+// PEF Design Google OAuth flow.
 // Required: DB, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, ALLOWED_ORIGIN.
 // Google Cloud authorized redirect: https://<worker-host>/auth/google/callback
 const enc = new TextEncoder();
@@ -8,6 +8,15 @@ const b64url = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).repl
 const json=(v,status=200)=>new Response(JSON.stringify(v),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const cookie=(name,value,age)=>`${name}=${value}; Path=/auth/google; HttpOnly; Secure; SameSite=Lax; Max-Age=${age}`;
 const callbackUrl=req=>new URL('/auth/google/callback',req.url).toString();
+const productionOrigin='https://pef-design.vercel.app';
+const migrationOrigin='https://pef-design-migration-preview.galeriaparislisboa.workers.dev';
+const allowedOrigins=new Set([
+ productionOrigin,
+ migrationOrigin,
+ 'https://pef-design-git-feature-admin-moderation-pef-design.vercel.app',
+ 'https://pef-design-i1f8ezuys-pef-design.vercel.app',
+ 'https://pef-design-c6b0uct6y-pef-design.vercel.app',
+]);
 const oauthCookie='pef_google_flow';
 const fail=(message,status=400)=>json({error:message},status);
 const validConfig=env=>env.DB&&env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.AUTH_COOKIE_KEY;
@@ -16,6 +25,12 @@ export async function googleAuth(request,env,issueSession) {
  const u=new URL(request.url);
  if(request.method!=='GET')return fail('Method not allowed',405);
  if(u.pathname==='/auth/google/start'){
+  let referringOrigin;
+  try{referringOrigin=new URL(request.headers.get('Referer')).origin}catch{}
+  const requestedOrigin=u.searchParams.get('origin');
+  if(requestedOrigin&&!allowedOrigins.has(requestedOrigin))return fail('Unsupported PEF origin',400);
+  const origin=requestedOrigin||(allowedOrigins.has(referringOrigin)?referringOrigin:
+   u.searchParams.get('app')==='production'?productionOrigin:migrationOrigin);
   const state=random(),verifier=random(48),nonce=random();
   const challenge=b64url(await crypto.subtle.digest('SHA-256',enc.encode(verifier)));
   // The encrypted cookie binds the callback to the browser that initiated the flow.
@@ -25,7 +40,7 @@ export async function googleAuth(request,env,issueSession) {
   if(keyBytes.length!==32)return fail('Invalid cookie key',503);
   const key=await crypto.subtle.importKey('raw',keyBytes,'AES-GCM',false,['encrypt']);
   const iv=crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify({state,verifier,nonce,iat:Date.now(),production:u.searchParams.get("app")==="production"})));
+  const ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify({state,verifier,nonce,iat:Date.now(),origin})));
   const packed=b64url(new Uint8Array([...iv,...new Uint8Array(ciphertext)]));
   const auth=new URL('https://accounts.google.com/o/oauth2/v2/auth');
   for(const [k,v] of Object.entries({client_id:env.GOOGLE_CLIENT_ID,redirect_uri:callbackUrl(request),response_type:'code',scope:'openid email profile',state,nonce,code_challenge:challenge,code_challenge_method:'S256',prompt:'select_account'}))auth.searchParams.set(k,v);
@@ -59,9 +74,11 @@ export async function googleAuth(request,env,issueSession) {
   if(email!=='galeriaparislisboa@gmail.com')return fail('Use the email code for this account',403);
   const account=await env.DB.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').bind(email).first();
   if(!account)return fail('Gallery account unavailable',403);
-  const origin=JSON.stringify(flow.production===true?"https://pef-design.vercel.app":"https://pef-design-migration-preview.galeriaparislisboa.workers.dev");
+  const returnOrigin=flow.origin??(flow.production===true?productionOrigin:migrationOrigin);
+  if(!allowedOrigins.has(returnOrigin))return fail('Unsupported PEF origin',400);
+  const origin=JSON.stringify(returnOrigin);
   const payload=JSON.stringify({type:'pef-google-auth',token:await issueSession(email),role:'gallery'});
-  const html=`<!doctype html><meta charset="utf-8"><title>PEF sign-in</title><script>if(window.opener){window.opener.postMessage(${payload},${origin});window.close()}else{document.body.textContent='Open PEF Design and try again.'}</script>`;
+  const html=`<!doctype html><meta charset="utf-8"><title>PEF sign-in</title><body><script>if(window.opener){window.opener.postMessage(${payload},${origin});setTimeout(()=>window.close(),300)}else{document.body.textContent='Open PEF Design and try again.'}</script>`;
   return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",'Set-Cookie':cleared,'Referrer-Policy':'no-referrer'}});
  }catch{return new Response(JSON.stringify({error:'Google sign-in failed'}),{status:400,headers:{'Content-Type':'application/json','Set-Cookie':cleared,'Cache-Control':'no-store'}})}
 }
