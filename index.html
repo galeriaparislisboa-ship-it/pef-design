@@ -1736,6 +1736,10 @@ document.addEventListener('DOMContentLoaded',()=>{const root=document.getElement
   function update(){f.lastElementChild.disabled=!phone||!selected().length;try{localStorage.setItem(key,JSON.stringify(selected().map(p=>p.id)))}catch{}}
   boxes.forEach(b=>b.onchange=update);update()
  }));
+ if(pieces.length)button(actions,'Request a quote',()=>panel('Request a quote',f=>{
+  const s=choose(f),city=field(f,'Delivery city (optional)');city.required=false;
+  submit(f,'Request quote on WhatsApp',()=> 'Hello, could you send me a quote for '+ref(pieces[s.value])+'?'+(city.value.trim()?' Please include delivery to '+city.value.trim()+'.':''))
+ }));
  button(actions,'Find a piece',()=>panel('Find a piece',f=>{
   const brief=field(f,'What are you looking for?'),budget=field(f,'Budget and currency'),city=field(f,'City');
   submit(f,'Send sourcing request',()=> 'Sourcing request: '+brief.value+'\nBudget: '+budget.value+'\nCity: '+city.value)
