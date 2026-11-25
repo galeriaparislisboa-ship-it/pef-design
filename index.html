@@ -1905,7 +1905,7 @@ function fridayGalleryListing(row,api,headers,box){
  if(Number(row.is_hidden))meta.textContent+=' · Hidden';
  heading.append(thumb,name,meta);
  const story=document.createElement('button');
- story.type='button';story.textContent='Create a Story';
+ story.type='button';story.textContent='Edit a content';
  story.onclick=()=>openPefStory({...row,title:name.textContent});
  card.append(metrics,story,details,saveDetails,detailsStatus,mountFridayMedia(row,api,headers));
  accordion.append(heading,card);
@@ -3042,12 +3042,12 @@ if(pefNewsletterRoute==='preview')openPefNewsletter();
 else if(/^[0-9a-f-]{36}$/i.test(pefNewsletterRoute??''))openPublishedPefNewsletter(pefNewsletterRoute);
 </script><script>function pefStoryShortcut(rows){
  const button=document.createElement('button');
- button.type='button';button.textContent='Create a Story';button.hidden=!rows.length;
+ button.type='button';button.textContent='Edit a content';button.hidden=!rows.length;
  button.onclick=()=>{
   if(rows.length===1){openPefStory(rows[0]);return}
   const chooser=document.createElement('dialog');
   chooser.className='pef-story-editor pef-story-chooser';
-  chooser.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-settings"><label>Listing <select></select></label><div class="pef-story-actions"><button type="button" data-open>Open editor</button></div></div>';
+  chooser.innerHTML='<header><h2>Edit a content</h2><button type="button" data-close>Close</button></header><div class="pef-story-settings"><label>Listing <select></select></label><div class="pef-story-actions"><button type="button" data-open>Open editor</button></div></div>';
   const select=chooser.querySelector('select');
   rows.forEach((row,index)=>select.add(new Option(row.title||'Untitled',index)));
   chooser.querySelector('[data-close]').onclick=()=>chooser.close();
@@ -3062,7 +3062,7 @@ function openPefStory(row){
  const dialog=document.createElement('dialog');
  dialog.className='pef-story-editor';
  dialog.setAttribute('data-pef-story-editor','');
- dialog.innerHTML='<header><h2>Create a Story</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Story preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div><div class="pef-story-selection" hidden></div><nav class="pef-story-toolbar" aria-label="Story tools"><button type="button" data-add-text aria-label="Add text">Aa</button><button type="button" data-tool="photo" aria-expanded="false">Photo</button><button type="button" data-tool="logo" aria-expanded="false">Logo</button><button type="button" data-tool="links" aria-expanded="false">Link</button></nav><div class="pef-story-tool-panel" hidden></div><div class="pef-story-quick" hidden><input data-quick-text aria-label="Edit selected text" maxlength="160"><div><input type="color" data-quick-color aria-label="Text color"><button type="button" data-quick-bg>Background</button><button type="button" data-quick-shadow>Shadow</button><button type="button" data-quick-done>Done</button></div><input type="range" data-quick-size min="24" max="96" aria-label="Text size"></div></div><div class="pef-story-settings"><div data-panel="photo"><label>Photo <select data-photo></select></label><label>Framing <select data-framing><option value="fit">Fit</option><option value="fill">Fill</option></select></label></div><p>Tap to edit. Drag to move.</p><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset data-panel="logo"><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white" selected>White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download Story</button><button type="button" data-share hidden>Share Story</button></div><div class="pef-story-actions" data-panel="links"><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
+ dialog.innerHTML='<header><h2>Edit a content</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Content preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div><div class="pef-story-selection" hidden></div><nav class="pef-story-toolbar" aria-label="Content tools"><button type="button" data-add-text aria-label="Add text">Aa</button><button type="button" data-tool="photo" aria-expanded="false">Photo</button><button type="button" data-tool="logo" aria-expanded="false">Logo</button><button type="button" data-tool="links" aria-expanded="false">Link</button></nav><div class="pef-story-tool-panel" hidden></div><div class="pef-story-quick" hidden><input data-quick-text aria-label="Edit selected text" maxlength="160"><div><input type="color" data-quick-color aria-label="Text color"><button type="button" data-quick-bg>Background</button><button type="button" data-quick-shadow>Shadow</button><button type="button" data-quick-done>Done</button></div><input type="range" data-quick-size min="24" max="96" aria-label="Text size"></div></div><div class="pef-story-settings"><div data-panel="photo"><label>Photo <select data-photo></select></label><label>Framing <select data-framing><option value="fit">Fit</option><option value="fill">Fill</option></select></label></div><p>Tap to edit. Drag to move.</p><label>Layout <select data-layout><option value="left">Left</option><option value="right">Right</option></select></label><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset data-panel="logo"><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white" selected>White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download content</button><button type="button" data-share hidden>Share content</button></div><div class="pef-story-actions" data-panel="links"><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
  const find=selector=>dialog.querySelector(selector);
  const canvas=find('canvas'),ctx=canvas.getContext('2d');
  const status=find('[role=status]'),photoSelect=find('[data-photo]'), stage=find('.pef-story-stage');
@@ -3080,12 +3080,12 @@ function openPefStory(row){
   'Typewriter':'"Courier New",monospace',
   'Bold poster':'Impact,"Arial Black",sans-serif',
  };
- const typeface=find('[data-typeface]');
+ const typeface=find('[data-typeface]'),layout=find('[data-layout]');
  for(const font of Object.keys(fonts))typeface.add(new Option(font,font));
  typeface.onchange=draw;
  for(const layer of layers)Object.assign(layer,{color:'#ffffff',background:'#222222',pill:false,shadow:false});
- const frameMargin=44,storyLeftMargin=96;
- const logo={x:storyLeftMargin,y:225,width:265};
+ const frameMargin=44,storyLeftMargin=96,textMaxWidth=840;
+ const logo={x:storyLeftMargin,y:225,width:265,anchored:true};
  let logoImage=null,logoVersion=0,image=null,loadVersion=0,drag=null;
  const bounds=new Map(),layerFields=new Map();
  const quick=find('.pef-story-quick'),selection=find('.pef-story-selection');
@@ -3154,16 +3154,23 @@ function openPefStory(row){
   return (layer.name==='Title'?'600 ':'500 ')+layer.size+'px '+fonts[typeface.value];
  }
  function positionInitialText(){
-  let bottom=1650;
-  for(const layer of [...layers].reverse()){
-   layer.x=storyLeftMargin;
+  const preset=layers.slice(0,3),right=layout.value==='right';
+  let widest=0,bottom=1650;
+  for(const layer of [...preset].reverse()){
    if(!layer.visible||!layer.text.trim())continue;
    ctx.font=storyFont(layer);
-   const height=lines(layer.text,1080-storyLeftMargin-96).length*Math.round(layer.size*1.18);
+   const wrapped=lines(layer.text,textMaxWidth);
+   for(const line of wrapped)widest=Math.max(widest,ctx.measureText(line).width);
+   const height=wrapped.length*Math.round(layer.size*1.18);
    layer.y=bottom-height;
    bottom=layer.y-38;
   }
+  const left=right?1080-storyLeftMargin-Math.max(110,Math.min(textMaxWidth,Math.ceil(widest))):storyLeftMargin;
+  for(const layer of preset)layer.x=left;
+  logo.anchored=true;
+  logo.y=225;
  }
+ layout.onchange=()=>{positionInitialText();draw()};
  function draw(){
   ctx.fillStyle='#fff';ctx.fillRect(0,0,1080,1920);
   ctx.fillStyle='#151515';ctx.fillRect(frameMargin,frameMargin,1080-2*frameMargin,1920-2*frameMargin);
@@ -3177,6 +3184,7 @@ function openPefStory(row){
   bounds.clear();
   if(logoImage){
    const width=logo.width,height=width*logoImage.naturalHeight/logoImage.naturalWidth;
+   if(logo.anchored)logo.x=layout.value==='right'?1080-storyLeftMargin-width:storyLeftMargin;
    logo.x=Math.min(logo.x,1080-width-36);logo.y=Math.min(logo.y,1920-height-36);
    ctx.drawImage(logoImage,logo.x,logo.y,width,height);
    bounds.set(logo,{x:logo.x,y:logo.y,w:width,h:height});
@@ -3186,7 +3194,7 @@ function openPefStory(row){
    ctx.font=storyFont(layer);
    ctx.textAlign='left';
    ctx.textBaseline='top';
-   const max=Math.max(110,1080-layer.x-96);
+   const max=Math.max(110,Math.min(textMaxWidth,1080-layer.x-storyLeftMargin));
    const wrapped=lines(layer.text,max),lineHeight=Math.round(layer.size*1.18);
    const width=Math.min(max,Math.max(...wrapped.map(line=>ctx.measureText(line).width)));
    if(layer.pill){
@@ -3213,7 +3221,7 @@ function openPefStory(row){
   download.disabled=share.disabled=true;
   image=null;draw();
   const url=photos[Number(photoSelect.value)];
-  if(!url){status.textContent='Add a photo to the listing to create a Story.';return}
+  if(!url){status.textContent='Add a photo to the listing to edit content.';return}
   status.textContent='Loading photo…';
   const candidate=new Image();candidate.crossOrigin='anonymous';
   candidate.onload=()=>{
@@ -3282,6 +3290,7 @@ function openPefStory(row){
   const p=point(event),{layer,dx,dy,b,x,y}=drag;
   if(!drag.moved&&Math.hypot(p.x-x,p.y-y)<16)return;
   drag.moved=true;
+  if(layer===logo)logo.anchored=false;
   layer.x=Math.max(frameMargin+18,Math.min(Math.max(frameMargin+18,1080-b.w-frameMargin),p.x-dx));
   layer.y=Math.max(frameMargin+12,Math.min(1920-b.h-frameMargin,p.y-dy));
   draw();
@@ -3309,12 +3318,12 @@ function openPefStory(row){
   });
  };
  find('[data-guides]').onchange=event=>{stage.querySelector('.pef-story-guides').hidden=!event.target.checked};
- const getStoryFile=async()=>{await logoReady;return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(new File([blob],'pef-story.jpg',{type:'image/jpeg'})):reject(Error('Could not export the Story.')),'image/jpeg',.92))};
+ const getStoryFile=async()=>{await logoReady;return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(new File([blob],'pef-content.jpg',{type:'image/jpeg'})):reject(Error('Could not export the content.')),'image/jpeg',.92))};
  download.onclick=async()=>{
   try{
    const file=await getStoryFile(),url=URL.createObjectURL(file),link=document.createElement('a');
    link.href=url;link.download=file.name;link.click();
-   setTimeout(()=>URL.revokeObjectURL(url),1000);status.textContent='Story downloaded.';
+   setTimeout(()=>URL.revokeObjectURL(url),1000);status.textContent='Content downloaded.';
   }catch(error){status.textContent=error.message}
  };
  if(navigator.share&&navigator.canShare){
@@ -3322,7 +3331,7 @@ function openPefStory(row){
   share.onclick=async()=>{
    try{
     const files=[await getStoryFile()];
-    if(!navigator.canShare({files}))throw Error('Sharing is unavailable on this device. Download the Story instead.');
+    if(!navigator.canShare({files}))throw Error('Sharing is unavailable on this device. Download the content instead.');
     await navigator.share({files});
    }catch(error){if(error.name!=='AbortError')status.textContent=error.message}
   };
@@ -3352,6 +3361,6 @@ if(new URL(location.href).searchParams.get('story')==='preview'){
  pefFetchCloudflareListings().then(rows=>{
   const sample=rows.find(row=>row.seller_id==='f81528f3-3c3c-4590-9ee9-543f950b6884'&&row.photos.length);
   if(sample)openPefStory(sample);else alert('No gallery photo is available for this preview.');
- }).catch(()=>alert('Could not load the gallery Story preview.'));
+ }).catch(()=>alert('Could not load the gallery Content preview.'));
 }
 </script></body></html>
