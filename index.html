@@ -1005,6 +1005,20 @@ transform:none!important;
  background:#252525a6;color:#fff;font:14px/1 system-ui;
 }
 .pef-story-editor .pef-story-remove-text:is(:hover,:focus-visible)::after{background:#252525}
+.pef-story-editor{--pef-content-ratio:1.777777778}
+.pef-story-stage :is(.pef-story-quick,.pef-story-tool-panel){
+ max-height:calc(100% - 58px);overflow:auto;overscroll-behavior:contain;box-sizing:border-box
+}
+.pef-story-editor .pef-story-quick{gap:5px;padding:7px}
+.pef-story-quick [data-quick-text]{min-height:32px;margin:0;padding:4px 6px}
+.pef-story-quick [data-quick-size],.pef-story-tool-panel input[type=range]{min-height:24px!important;height:24px;margin:0!important;padding:0}
+.pef-story-quick .pef-quick-align{padding:2px}
+.pef-story-editor .pef-story-quick button{min-height:28px}
+.pef-story-editor .pef-story-settings{min-height:0;overflow:auto;overscroll-behavior:contain}
+.pef-story-settings label{gap:3px}
+.pef-story-settings fieldset{padding:6px;margin-bottom:5px}
+@media(min-width:621px){.pef-story-layout>.pef-story-settings{contain:size;align-self:stretch}}
+@media(max-width:620px){.pef-story-layout>.pef-story-settings{max-height:calc(min(220px, 82vw) * var(--pef-content-ratio))}}
 .pef-story-palette{display:flex;flex-wrap:wrap;gap:12px}
 .pef-story-palette input[type=color]{width:48px;height:34px;padding:2px;border:1px solid #aaa;border-radius:7px;background:#fff}
 .pef-story-settings [hidden]{display:none!important}
@@ -3097,7 +3111,7 @@ function openPefStory(row){
  const dialog=document.createElement('dialog');
  dialog.className='pef-story-editor';
  dialog.setAttribute('data-pef-story-editor','');
- dialog.innerHTML='<header><h2>Edit a content</h2><button type="button" data-close aria-label="Close dialog" title="Close"><span aria-hidden="true">×</span></button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Content preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div><div class="pef-story-selection" hidden></div><nav class="pef-story-toolbar" aria-label="Content tools"><button type="button" data-add-text aria-label="Add text">Aa</button><button type="button" data-tool="photo" aria-expanded="false">Photo</button><button type="button" data-tool="logo" aria-expanded="false">Logo</button><button type="button" data-tool="links" aria-expanded="false">Link</button></nav><div class="pef-story-tool-panel" hidden><div class="pef-story-tool-heading"><button type="button" data-tool-close aria-label="Close tool panel" title="Close">×</button></div></div><div class="pef-story-quick" hidden><div class="pef-quick-header"><strong data-quick-label>Text</strong><button type="button" data-quick-dock aria-pressed="false">Move off image</button><button type="button" data-quick-done aria-label="Close text editor">×</button></div><input data-quick-text aria-label="Edit selected text" maxlength="160"><div><input type="color" data-quick-color aria-label="Text color"><button type="button" data-quick-bg>Background</button><button type="button" data-quick-shadow>Shadow</button></div><input type="range" data-quick-size min="24" max="96" aria-label="Text size"><div class="pef-quick-align" role="group" aria-label="Text alignment"><button type="button" data-quick-align="left">Left</button><button type="button" data-quick-align="center">Center</button><button type="button" data-quick-align="right">Right</button></div></div></div><div class="pef-story-settings"><div class="pef-quick-dock"></div><div data-panel="photo"><label>Photo <select data-photo></select></label><label>Framing <select data-framing><option value="fit">Fit</option><option value="fill">Fill</option></select></label><label>Zoom <input type="range" data-photo-zoom min="100" max="250" step="5" value="100" aria-label="Photo zoom"></label></div><p>Tap to edit. Drag to move.</p><label>Layout <select data-layout><option value="left">Left</option><option value="right">Right</option></select></label><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset data-panel="logo"><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white" selected>White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download content</button><button type="button" data-share hidden>Share content</button></div><div class="pef-story-actions" data-panel="links"><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
+ dialog.innerHTML='<header><h2>Edit a content</h2><button type="button" data-close aria-label="Close dialog" title="Close"><span aria-hidden="true">×</span></button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Content preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div><div class="pef-story-selection" hidden></div><nav class="pef-story-toolbar" aria-label="Content tools"><button type="button" data-add-text aria-label="Add text">Aa</button><button type="button" data-tool="photo" aria-expanded="false">Photo</button><button type="button" data-tool="logo" aria-expanded="false">Logo</button><button type="button" data-tool="links" aria-expanded="false">Link</button></nav><div class="pef-story-tool-panel" hidden><div class="pef-story-tool-heading"><button type="button" data-tool-close aria-label="Close tool panel" title="Close">×</button></div></div><div class="pef-story-quick" hidden><div class="pef-quick-header"><strong data-quick-label>Text</strong><button type="button" data-quick-dock aria-pressed="false">Move off image</button><button type="button" data-quick-done aria-label="Close text editor">×</button></div><input data-quick-text aria-label="Edit selected text" maxlength="160"><div><input type="color" data-quick-color aria-label="Text color"><button type="button" data-quick-bg>Background</button><button type="button" data-quick-shadow>Shadow</button></div><input type="range" data-quick-size min="24" max="96" aria-label="Text size"><div class="pef-quick-align" role="group" aria-label="Text alignment"><button type="button" data-quick-align="left">Left</button><button type="button" data-quick-align="center">Center</button><button type="button" data-quick-align="right">Right</button></div></div></div><div class="pef-story-settings"><div class="pef-quick-dock"></div><div data-panel="photo"><label>Photo <select data-photo></select></label><label>Framing <select data-framing><option value="fit">Fit</option><option value="fill">Fill</option></select></label><label>Zoom <input type="range" data-photo-zoom min="100" max="250" step="5" value="100" aria-label="Photo zoom"></label></div><label>Visual size <select data-content-size><option value="1920">1080 × 1920 · Vertical</option><option value="1350">1080 × 1350 · Portrait</option><option value="1080">1080 × 1080 · Square</option></select></label><label>Layout <select data-layout><option value="left">Left</option><option value="right">Right</option></select></label><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset data-panel="logo"><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white" selected>White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download content</button><button type="button" data-share hidden>Share content</button></div><div class="pef-story-actions" data-panel="links"><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
  const find=selector=>dialog.querySelector(selector);
  const canvas=find('canvas'),ctx=canvas.getContext('2d');
  const status=find('[role=status]'),photoSelect=find('[data-photo]'), stage=find('.pef-story-stage');
@@ -3147,6 +3161,18 @@ function openPefStory(row){
  find('[data-tool-close]').onclick=closeTool;
  const framing=find('[data-framing]'),photoZoom=find('[data-photo-zoom]');
  framing.onchange=draw;photoZoom.oninput=draw;
+ const contentSize=find('[data-content-size]');
+ let visualHeight=canvas.height;
+ contentSize.onchange=()=>{
+  const next=Number(contentSize.value);
+  if(![1920,1350,1080].includes(next)||next===visualHeight)return;
+  const ratio=next/visualHeight;
+  for(const item of [logo,...layers])item.y*=ratio;
+  visualHeight=next;canvas.height=next;
+  dialog.style.setProperty('--pef-content-ratio',String(next/1080));
+  stage.style.aspectRatio='1080 / '+next;
+  draw();
+ };
  const quickText=find('[data-quick-text]'),quickColor=find('[data-quick-color]'),quickSize=find('[data-quick-size]');
  const quickAlign=[...quick.querySelectorAll('[data-quick-align]')];
  const quickBg=find('[data-quick-bg]'),quickShadow=find('[data-quick-shadow]');
@@ -3215,7 +3241,7 @@ function openPefStory(row){
  }
  function positionInitialText(){
   const preset=layers.slice(0,3),right=layout.value==='right';
-  let widest=0,bottom=1650;
+  let widest=0,bottom=visualHeight-270*visualHeight/1920;
   for(const layer of [...preset].reverse()){
    if(!layer.visible||!layer.text.trim())continue;
    ctx.font=storyFont(layer);
@@ -3232,20 +3258,20 @@ function openPefStory(row){
  }
  layout.onchange=()=>{positionInitialText();draw()};
  function draw(){
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,1080,1920);
-  ctx.fillStyle='#151515';ctx.fillRect(frameMargin,frameMargin,1080-2*frameMargin,1920-2*frameMargin);
-  ctx.save();ctx.beginPath();ctx.rect(frameMargin,frameMargin,1080-2*frameMargin,1920-2*frameMargin);ctx.clip();
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,1080,visualHeight);
+  ctx.fillStyle='#151515';ctx.fillRect(frameMargin,frameMargin,1080-2*frameMargin,visualHeight-2*frameMargin);
+  ctx.save();ctx.beginPath();ctx.rect(frameMargin,frameMargin,1080-2*frameMargin,visualHeight-2*frameMargin);ctx.clip();
   if(image){
    const fit=framing.value==='fill'?Math.max:Math.min;
-   const scale=fit((1080-2*frameMargin)/image.naturalWidth,(1920-2*frameMargin)/image.naturalHeight)*Number(photoZoom.value)/100;
+   const scale=fit((1080-2*frameMargin)/image.naturalWidth,(visualHeight-2*frameMargin)/image.naturalHeight)*Number(photoZoom.value)/100;
    const w=image.naturalWidth*scale,h=image.naturalHeight*scale;
-   ctx.drawImage(image,(1080-w)/2,(1920-h)/2,w,h);
+   ctx.drawImage(image,(1080-w)/2,(visualHeight-h)/2,w,h);
   }
   bounds.clear();
   if(logoImage){
    const width=logo.width,height=width*logoImage.naturalHeight/logoImage.naturalWidth;
    if(logo.anchored)logo.x=layout.value==='right'?1080-storyLeftMargin-width:storyLeftMargin;
-   logo.x=Math.min(logo.x,1080-width-36);logo.y=Math.min(logo.y,1920-height-36);
+   logo.x=Math.min(logo.x,1080-width-36);logo.y=Math.min(logo.y,visualHeight-height-36);
    ctx.drawImage(logoImage,logo.x,logo.y,width,height);
    bounds.set(logo,{x:logo.x,y:logo.y,w:width,h:height});
   }
@@ -3276,13 +3302,13 @@ function openPefStory(row){
    remove.hidden=!box;
    if(!box)continue;
    remove.style.left='min(calc(100% - 30px), '+((box.x+box.w+8)/10.8)+'%)';
-   remove.style.top=((box.y+Math.min(box.h/2,38))/19.2)+'%';
+   remove.style.top=((box.y+Math.min(box.h/2,38))/visualHeight*100)+'%';
   }
   const selected=bounds.get(activeLayer);
   selection.hidden=!selected;
   if(selected){
-   selection.style.left=selected.x/10.8+'%';selection.style.top=selected.y/19.2+'%';
-   selection.style.width=selected.w/10.8+'%';selection.style.height=selected.h/19.2+'%';
+   selection.style.left=selected.x/10.8+'%';selection.style.top=selected.y/visualHeight*100+'%';
+   selection.style.width=selected.w/10.8+'%';selection.style.height=selected.h/visualHeight*100+'%';
   }
  }
  function changePhoto(){
@@ -3355,14 +3381,14 @@ function openPefStory(row){
  addText.onclick=()=>{
   const count=layers.length-3;
   if(count>=5)return;
-  const layer={name:'Text '+nextTextNumber++,text:'Your text',visible:true,size:54,x:storyLeftMargin,y:700+count*105,color:'#ffffff',background:'#222222',pill:false,shadow:false,align:'left'};
+  const layer={name:'Text '+nextTextNumber++,text:'Your text',visible:true,size:54,x:storyLeftMargin,y:Math.min(visualHeight-150,visualHeight*.365+count*85),color:'#ffffff',background:'#222222',pill:false,shadow:false,align:'left'};
   layers.push(layer);mountLayer(layer);selectLayer(layer);
   quickText.focus();quickText.select();
   addText.disabled=count===4;
  };
  function point(event){
   const rect=canvas.getBoundingClientRect();
-  return {x:(event.clientX-rect.left)*1080/rect.width,y:(event.clientY-rect.top)*1920/rect.height};
+  return {x:(event.clientX-rect.left)*1080/rect.width,y:(event.clientY-rect.top)*visualHeight/rect.height};
  }
  canvas.onpointerdown=event=>{
   const {x,y}=point(event);
@@ -3380,7 +3406,7 @@ function openPefStory(row){
   drag.moved=true;
   if(layer===logo)logo.anchored=false;
   layer.x=Math.max(frameMargin+18,Math.min(Math.max(frameMargin+18,1080-b.w-frameMargin),p.x-dx));
-  layer.y=Math.max(frameMargin+12,Math.min(1920-b.h-frameMargin,p.y-dy));
+  layer.y=Math.max(frameMargin+12,Math.min(visualHeight-b.h-frameMargin,p.y-dy));
   draw();
  };
  canvas.onpointerup=event=>{
