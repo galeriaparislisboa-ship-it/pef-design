@@ -817,7 +817,7 @@ transform:none!important;
  width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #d2d2d2!important;
  border-radius:10px;background:#efefef!important;color:#333!important;font:inherit
 }
-</style><link rel="stylesheet" href="/moderation-ui.css"><script src="/moderation-ui.js"></script><style>.pef-newsletter{width:min(96vw,1060px);max-height:90dvh;box-sizing:border-box;border:1px solid #ccc;border-radius:20px;background:#f5f5f5;color:#222;padding:20px;font:14px/1.4 system-ui;overflow:auto}
+</style><link rel="stylesheet" href="/moderation-ui.css?v=2"><script src="/moderation-ui.js?v=2"></script><style>.pef-newsletter{width:min(96vw,1060px);max-height:90dvh;box-sizing:border-box;border:1px solid #ccc;border-radius:20px;background:#f5f5f5;color:#222;padding:20px;font:14px/1.4 system-ui;overflow:auto}
 .pef-newsletter::backdrop{background:#000b}
 .pef-newsletter header,.pef-newsletter-preview,.pef-newsletter-actions,.pef-newsletter-piece{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pef-newsletter header{margin-bottom:12px}
@@ -1995,6 +1995,7 @@ function fridayGalleryListing(row,api,headers,box){
  story.type='button';story.textContent='Edit a content';
  story.onclick=()=>openPefStory({...row,title:name.textContent});
  card.append(metrics,story,details,saveDetails,detailsStatus,mountFridayMedia(row,api,headers));
+ if(!box)return card;
  accordion.append(heading,card);
  accordion.addEventListener('toggle',()=>{if(accordion.open)for(const other of box.querySelectorAll('details[open]'))if(other!==accordion)other.open=false});
  return accordion;
@@ -2106,7 +2107,7 @@ async function openCloudflareProfile(token){
  if(legacyAdmin)legacyAdmin.style.display='none';
  panel.classList.toggle('cf-admin-profile',account.role==='admin');
  if(account.role==='admin'){
-  window.pefModeration.mount(list,token,row=>fridayGalleryListing(row,api,headers,document.createElement('div')),loadRemote);
+  window.pefModeration.mount(list,token,row=>fridayGalleryListing(row,api,headers),loadRemote);
   return;
  }
  if(account.role==='seller'){

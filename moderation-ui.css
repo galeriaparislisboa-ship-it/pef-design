@@ -12,3 +12,8 @@
 .pef-moderation .pef-decision textarea{flex:1 1 100%}
 .pef-verification-cloudflare form{display:grid;gap:8px;padding:10px}
 .pef-verification-cloudflare label{display:grid;gap:4px}
+.app:has(#profile:not(.hidden) .cf-admin-profile) > .top{display:none}
+#profile:has(.cf-admin-profile){padding-top:max(16px,env(safe-area-inset-top));padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+#pefCloudflareProfile .pef-moderation nav button[aria-pressed="false"]{background:#fff;border:1px solid #d8d8dc}
+#pefCloudflareProfile .pef-moderation nav button[aria-pressed="true"]{background:#a8cff1;border:1px solid #719ec5}
+#pefCloudflareProfile .pef-moderation input[type="search"]{background:#fff;color:#1c1c1e;width:100%}

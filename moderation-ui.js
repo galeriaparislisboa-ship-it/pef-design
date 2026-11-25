@@ -52,18 +52,21 @@
   const nav=el('nav'), controls=el('div'), list=el('div'), feedback=statusLine();
   const search=Object.assign(el('input'),{type:'search',placeholder:'Rechercher'});
   search.setAttribute('aria-label','Rechercher dans la section');
-  let active='listings',data,busy=false,category,filter,order;
+  let active='listings',data,busy=false,category,filter,order,sellerFilter;
   const titles={listings:'Annonces',accounts:'Comptes',reports:'Signalements',requests:'Certifications',history:'Historique'};
   const pending=rows=>rows.filter(row=>row.status==='pending').length;
   const formatDate=value=>value?new Date(value.replace(' ','T')+(value.includes('T')?'':'Z')).toLocaleString('fr-FR'):'';
   const name=id=>{const account=data.accounts.find(row=>row.id===id);return account?.display_name||account?.email||id||'Compte inconnu'};
+  function selectSection(key,sellerId){
+   active=key;
+   sellerFilter=sellerId;
+   search.value='';
+   if(data){renderControls();renderList()}
+   else refresh();
+   nav.scrollIntoView({block:'nearest'});
+  }
   const tabButtons=Object.fromEntries(Object.entries(titles).map(([key,title])=>{
-   const tab=button(title,()=>{
-    active=key;
-    search.value='';
-    if(data){renderControls();renderList()}
-    else refresh();
-   });
+   const tab=button(title,()=>selectSection(key));
    nav.append(tab);return [key,tab];
   }));
   async function refresh(){
@@ -97,6 +100,7 @@
    filter=options[active]?menu('Statut',options[active]):null;
    if(filter){filter.dataset.section=active;if(prior!==null)filter.value=prior;filter.onchange=renderList;controls.append(filter)}
    if(active==='listings'){
+    if(sellerFilter)controls.append(button('Toutes les annonces',()=>selectSection('listings')));
     const selected=category?.value||'', sorted=order?.value||'recent';
     const categories=[...new Set(data.listings.map(row=>row.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     category=menu('Catégorie',[['','Toutes les catégories'],...categories.map(value=>[value,value])]);
@@ -134,15 +138,20 @@
    const edit=el('details');edit.append(el('summary','Modifier l’annonce et ses médias'));
    edit.addEventListener('toggle',()=>{
     if(!edit.open||edit.childElementCount>1)return;
-    let photos=[];
-    try{photos=JSON.parse(row.photos||'[]')}catch{}
-    edit.append(editor({...row,photos,media:row.video_url?[{type:'video',url:row.video_url}]:[]}));
+    try{
+     const photos=Array.isArray(row.photos)?row.photos:JSON.parse(row.photos||'[]');
+     edit.append(editor({...row,photos,media:row.video_url?[{type:'video',url:row.video_url}]:[]}));
+    }catch(error){
+     console.error(error);
+     edit.append(el('p','Impossible d’ouvrir l’éditeur de cette annonce.'));
+    }
    });
    host.append(edit);
   }
   function renderList(){
    let rows=data[active].filter(row=>{
     if(!match(row,filter?.value))return false;
+    if(active==='listings'&&sellerFilter&&row.seller_id!==sellerFilter)return false;
     if(active==='listings'&&category.value&&row.category!==category.value)return false;
     const haystack=[row.title,row.display_name,row.email,row.category,row.city,row.country,row.reason,row.details,row.business_name,row.actor,row.action,row.target,row.note,row.reporter,row.seller_id&&name(row.seller_id)].filter(Boolean).join(' ').toLocaleLowerCase();
     return haystack.includes(search.value.trim().toLocaleLowerCase());
@@ -164,6 +173,11 @@
     }else if(active==='accounts'){
      item=card(name(row.id),[row.gallery?'Galerie':'Compte',row.archived_at?'Archivé':'Actif',row.badge&&row.badge!=='none'?'Certifié':'',row.listings+' annonce(s)'].filter(Boolean).join(' · '));
      item.content.append(el('p',[row.email,row.id,formatDate(row.archived_at)].filter(Boolean).join(' · ')));
+     if(row.listings>0)item.content.append(button('Voir les annonces ('+row.listings+')',()=>{
+      if(filter)filter.value='';
+      if(category)category.value='';
+      selectSection('listings',row.id);
+     }));
      if(row.email?.toLowerCase()!=='ndondina@muchimuchi.fr')decisions(item.content,row,[row.archived_at?'restore':'archive']);
     }else if(active==='reports'){
      item=card(row.title||'Annonce indisponible',states[row.status]+' · '+row.reason);
