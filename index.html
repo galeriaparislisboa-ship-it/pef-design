@@ -251,7 +251,8 @@ html,body{margin:0!important;padding:0!important;width:100%!important;overflow-x
 .feed .item{--pef-caption-height:170px}
 .feed .item .caption{bottom:calc(76px + env(safe-area-inset-bottom,0px))!important}
 @media(max-width:799px){.feed .item .caption{bottom:calc(84px + env(safe-area-inset-bottom,0px))!important}.feed .item .caption:has(.pef-feed-negotiable){max-height:calc(clamp(90px,19svh,170px) + 26px)!important}}
-.feed .caption .pef-negotiable-row{display:block;width:100%;text-align:left;clear:both}.feed .item .caption,.feed .item .side{translate:0 -12px}.pef-feed-status.pef-feed-negotiable{display:table;margin:5px 0 0}
+#feed .caption > .pef-negotiable-row{display:flex;justify-content:flex-start;align-self:stretch;clear:both;padding:0;margin:5px 0 0;text-align:left}
+#feed .caption > .pef-negotiable-row > .pef-feed-negotiable{display:inline-block;flex:none;margin:0}.feed .item .caption,.feed .item .side{translate:0 -12px}.pef-feed-status.pef-feed-negotiable{display:table;margin:5px 0 0}
 .feed .item .side{bottom:calc(90px + env(safe-area-inset-bottom,0px) + var(--pef-caption-height))!important;gap:9px!important}
 .feed .item .side>button:not(.offer-coin-button){width:43px!important;height:43px!important;min-height:43px!important;padding:8px!important}
 .feed .item .side>button:first-child{width:43px!important;height:43px!important}
