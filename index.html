@@ -970,6 +970,9 @@ transform:none!important;
 .pef-story-quick input[type=color]{width:34px;height:32px;padding:2px}
 .pef-story-editor .pef-story-quick button{min-height:32px;padding:3px 7px;font-size:11px}
 .pef-story-quick button[aria-pressed=true]{background:#555;color:#fff}
+.pef-story-editor .pef-story-remove-text{position:absolute;z-index:1;transform:translateY(-50%);display:grid;place-items:center;width:28px;height:28px;min-height:0;padding:0;background:#292929;color:white;border:1px solid #fff;border-radius:50%;font:18px/1 system-ui}
+.pef-story-editor .pef-story-remove-text[hidden]{display:none!important}
+.pef-story-editor .pef-story-remove-text:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .pef-story-selection{position:absolute;pointer-events:none;border:1px solid #fff;border-radius:5px;box-shadow:0 0 0 1px #222}
 .pef-story-editor .pef-story-quick{display:grid;gap:8px;padding:10px;border-radius:16px;background:#f2f2f2;color:#222}
 .pef-story-editor .pef-story-quick[hidden]{display:none!important}
@@ -3244,6 +3247,13 @@ function openPefStory(row){
    bounds.set(layer,{x:layer.x-18,y:layer.y-12,w:width+36,h:wrapped.length*lineHeight+22});
   }
   ctx.restore();
+  for(const [layer,{remove}] of layerFields){
+   const box=bounds.get(layer);
+   remove.hidden=!box;
+   if(!box)continue;
+   remove.style.left='min(calc(100% - 30px), '+((box.x+box.w+8)/10.8)+'%)';
+   remove.style.top=((box.y+Math.min(box.h/2,38))/19.2)+'%';
+  }
   const selected=bounds.get(activeLayer);
   selection.hidden=!selected;
   if(selected){
@@ -3293,7 +3303,21 @@ function openPefStory(row){
   for(const [value,title] of [['left','Left'],['center','Center'],['right','Right']])align.add(new Option(title,value));
   align.value=layer.align;
   align.onchange=()=>{layer.align=align.value;if(activeLayer===layer)syncQuick();draw()};
-  layerFields.set(layer,{text,size,color,pill,shadow,align,backgroundLabel});
+  const remove=document.createElement('button');
+  remove.type='button';remove.className='pef-story-remove-text';remove.textContent='×';remove.hidden=true;
+  remove.setAttribute('aria-label','Remove '+layer.name+' from the image');
+  remove.onclick=()=>{
+   const index=layers.indexOf(layer);
+   if(index<3){
+    toggle.checked=false;toggle.onchange();return;
+   }
+   layers.splice(index,1);layerFields.delete(layer);set.remove();remove.remove();
+   addText.disabled=false;
+   if(activeLayer===layer)selectLayer(null);else draw();
+  };
+  stage.append(remove);
+  layerFields.set(layer,{text,size,color,pill,shadow,align,backgroundLabel,remove});
+
   controls.append(text,labelFor('Size',size),labelFor('Text alignment',align),pillLabel,shadowLabel,palette);
   function sync(){controls.hidden=!layer.visible;draw()}
   toggle.onchange=()=>{layer.visible=toggle.checked;if(!layer.visible&&activeLayer===layer)selectLayer(null);sync()};
@@ -3303,10 +3327,11 @@ function openPefStory(row){
  }
  layers.forEach(mountLayer);
  const addText=find('[data-add-text]');
+ let nextTextNumber=1;
  addText.onclick=()=>{
   const count=layers.length-3;
   if(count>=5)return;
-  const layer={name:'Text '+(count+1),text:'Your text',visible:true,size:54,x:storyLeftMargin,y:700+count*105,color:'#ffffff',background:'#222222',pill:false,shadow:false,align:'left'};
+  const layer={name:'Text '+nextTextNumber++,text:'Your text',visible:true,size:54,x:storyLeftMargin,y:700+count*105,color:'#ffffff',background:'#222222',pill:false,shadow:false,align:'left'};
   layers.push(layer);mountLayer(layer);selectLayer(layer);
   quickText.focus();quickText.select();
   addText.disabled=count===4;
