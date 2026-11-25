@@ -971,6 +971,20 @@ transform:none!important;
 .pef-story-editor .pef-story-quick button{min-height:32px;padding:3px 7px;font-size:11px}
 .pef-story-quick button[aria-pressed=true]{background:#555;color:#fff}
 .pef-story-selection{position:absolute;pointer-events:none;border:1px solid #fff;border-radius:5px;box-shadow:0 0 0 1px #222}
+.pef-story-editor .pef-story-quick{display:grid;gap:8px;padding:10px;border-radius:16px;background:#f2f2f2;color:#222}
+.pef-story-editor .pef-story-quick[hidden]{display:none!important}
+.pef-quick-dock .pef-story-quick{position:static;margin-bottom:12px;border:1px solid #d2d2d2}
+.pef-story-quick .pef-quick-header{flex-wrap:nowrap;justify-content:space-between}
+.pef-quick-header strong{font-size:12px;overflow-wrap:anywhere}
+.pef-story-editor .pef-story-quick button{min-height:34px;padding:4px 8px;border:1px solid transparent;border-radius:8px;background:#e2e2e2;color:#222;font-weight:550}
+.pef-story-editor .pef-story-quick button[aria-pressed=true]{background:#555;color:white}
+.pef-story-editor .pef-story-quick [data-quick-done]{width:34px;flex:none;border-radius:50%;font-size:20px;line-height:1}
+.pef-story-quick [data-quick-text]{min-height:38px;padding:6px 8px;border:1px solid #aaa;border-radius:9px;background:white;color:#222}
+.pef-story-quick :is(input,button):focus-visible{outline:2px solid #666;outline-offset:2px}
+.pef-story-quick input{accent-color:#555}
+.pef-story-quick .pef-quick-align{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:3px;border-radius:10px;background:#ddd}
+.pef-story-editor .pef-quick-align button{min-width:0;padding-inline:2px}
+.pef-story-editor .pef-quick-align button[aria-pressed=true]{background:white;color:#222}
 .pef-story-palette{display:flex;flex-wrap:wrap;gap:12px}
 .pef-story-palette input[type=color]{width:48px;height:34px;padding:2px;border:1px solid #aaa;border-radius:7px;background:#fff}
 .pef-story-settings [hidden]{display:none!important}
@@ -3063,7 +3077,7 @@ function openPefStory(row){
  const dialog=document.createElement('dialog');
  dialog.className='pef-story-editor';
  dialog.setAttribute('data-pef-story-editor','');
- dialog.innerHTML='<header><h2>Edit a content</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Content preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div><div class="pef-story-selection" hidden></div><nav class="pef-story-toolbar" aria-label="Content tools"><button type="button" data-add-text aria-label="Add text">Aa</button><button type="button" data-tool="photo" aria-expanded="false">Photo</button><button type="button" data-tool="logo" aria-expanded="false">Logo</button><button type="button" data-tool="links" aria-expanded="false">Link</button></nav><div class="pef-story-tool-panel" hidden></div><div class="pef-story-quick" hidden><input data-quick-text aria-label="Edit selected text" maxlength="160"><div><input type="color" data-quick-color aria-label="Text color"><button type="button" data-quick-bg>Background</button><button type="button" data-quick-shadow>Shadow</button><button type="button" data-quick-done>Done</button></div><input type="range" data-quick-size min="24" max="96" aria-label="Text size"><select data-quick-align aria-label="Text alignment"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></div></div><div class="pef-story-settings"><div data-panel="photo"><label>Photo <select data-photo></select></label><label>Framing <select data-framing><option value="fit">Fit</option><option value="fill">Fill</option></select></label><label>Zoom <input type="range" data-photo-zoom min="100" max="250" step="5" value="100" aria-label="Photo zoom"></label></div><p>Tap to edit. Drag to move.</p><label>Layout <select data-layout><option value="left">Left</option><option value="right">Right</option></select></label><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset data-panel="logo"><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white" selected>White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download content</button><button type="button" data-share hidden>Share content</button></div><div class="pef-story-actions" data-panel="links"><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
+ dialog.innerHTML='<header><h2>Edit a content</h2><button type="button" data-close>Close</button></header><div class="pef-story-layout"><div class="pef-story-stage"><canvas width="1080" height="1920" aria-label="Content preview"></canvas><div class="pef-story-guides" aria-hidden="true"></div><div class="pef-story-selection" hidden></div><nav class="pef-story-toolbar" aria-label="Content tools"><button type="button" data-add-text aria-label="Add text">Aa</button><button type="button" data-tool="photo" aria-expanded="false">Photo</button><button type="button" data-tool="logo" aria-expanded="false">Logo</button><button type="button" data-tool="links" aria-expanded="false">Link</button></nav><div class="pef-story-tool-panel" hidden></div><div class="pef-story-quick" hidden><div class="pef-quick-header"><strong data-quick-label>Text</strong><button type="button" data-quick-dock aria-pressed="false">Move off image</button><button type="button" data-quick-done aria-label="Close text editor">×</button></div><input data-quick-text aria-label="Edit selected text" maxlength="160"><div><input type="color" data-quick-color aria-label="Text color"><button type="button" data-quick-bg>Background</button><button type="button" data-quick-shadow>Shadow</button></div><input type="range" data-quick-size min="24" max="96" aria-label="Text size"><div class="pef-quick-align" role="group" aria-label="Text alignment"><button type="button" data-quick-align="left">Left</button><button type="button" data-quick-align="center">Center</button><button type="button" data-quick-align="right">Right</button></div></div></div><div class="pef-story-settings"><div class="pef-quick-dock"></div><div data-panel="photo"><label>Photo <select data-photo></select></label><label>Framing <select data-framing><option value="fit">Fit</option><option value="fill">Fill</option></select></label><label>Zoom <input type="range" data-photo-zoom min="100" max="250" step="5" value="100" aria-label="Photo zoom"></label></div><p>Tap to edit. Drag to move.</p><label>Layout <select data-layout><option value="left">Left</option><option value="right">Right</option></select></label><label>Typeface <select data-typeface></select></label><div data-layers></div><fieldset data-panel="logo"><label>PEF logo <select data-logo><option value="">No logo</option><option value="black">Black</option><option value="white" selected>White</option></select></label><label data-logo-size-row hidden>Logo size <input type="range" data-logo-size min="100" max="600" value="265"></label></fieldset><label class="pef-story-switch"><input type="checkbox" data-guides checked> Show safe margins</label><div class="pef-story-actions"><button type="button" data-export>Download content</button><button type="button" data-share hidden>Share content</button></div><div class="pef-story-actions" data-panel="links"><button type="button" data-link>Copy listing link</button><button type="button" data-gallery-link>Copy gallery profile link</button><button type="button" data-app-link>Copy PEF app link</button></div><p role="status"></p></div></div>';
  const find=selector=>dialog.querySelector(selector);
  const canvas=find('canvas'),ctx=canvas.getContext('2d');
  const status=find('[role=status]'),photoSelect=find('[data-photo]'), stage=find('.pef-story-stage');
@@ -3108,7 +3122,7 @@ function openPefStory(row){
  const framing=find('[data-framing]'),photoZoom=find('[data-photo-zoom]');
  framing.onchange=draw;photoZoom.oninput=draw;
  const quickText=find('[data-quick-text]'),quickColor=find('[data-quick-color]'),quickSize=find('[data-quick-size]');
- const quickAlign=find('[data-quick-align]');
+ const quickAlign=[...quick.querySelectorAll('[data-quick-align]')];
  const quickBg=find('[data-quick-bg]'),quickShadow=find('[data-quick-shadow]');
  let activeLayer=null;
  function selectLayer(layer){
@@ -3122,7 +3136,8 @@ function openPefStory(row){
   quickText.value=activeLayer.text;
   quickColor.value=activeLayer.color;
   quickSize.value=activeLayer.size;
-  quickAlign.value=activeLayer.align;
+  find('[data-quick-label]').textContent=activeLayer.name;
+  for(const button of quickAlign)button.setAttribute('aria-pressed',String(button.dataset.quickAlign===activeLayer.align));
   quickBg.setAttribute('aria-pressed',String(activeLayer.pill));
   quickShadow.setAttribute('aria-pressed',String(activeLayer.shadow));
  }
@@ -3133,16 +3148,30 @@ function openPefStory(row){
   if(key==='pill'||key==='shadow')fields[key].checked=value;
   else fields[key].value=value;
   fields.backgroundLabel.hidden=!activeLayer.pill;
-  if(key==='pill'||key==='shadow')syncQuick();
+  if(key==='pill'||key==='shadow'||key==='align')syncQuick();
   draw();
  }
  quickText.oninput=()=>changeQuick('text',quickText.value);
  quickColor.oninput=()=>changeQuick('color',quickColor.value);
  quickSize.oninput=()=>changeQuick('size',Number(quickSize.value));
- quickAlign.onchange=()=>changeQuick('align',quickAlign.value);
+ for(const button of quickAlign)button.onclick=()=>changeQuick('align',button.dataset.quickAlign);
  quickBg.onclick=()=>changeQuick('pill',!activeLayer.pill);
  quickShadow.onclick=()=>changeQuick('shadow',!activeLayer.shadow);
  find('[data-quick-done]').onclick=()=>selectLayer(null);
+ const dockButton=find('[data-quick-dock]');
+ const dock=find('.pef-quick-dock');
+ dockButton.onclick=()=>{
+  const offImage=quick.parentElement!==dock;
+  (offImage?dock:stage).append(quick);
+  dockButton.setAttribute('aria-pressed',String(offImage));
+  dockButton.textContent=offImage?'Move onto image':'Move off image';
+  dockButton.focus({preventScroll:true});
+  if(offImage)quick.scrollIntoView({block:'nearest'});
+ };
+ dialog.addEventListener('cancel',event=>{
+  if(!activeLayer)return;
+  event.preventDefault();selectLayer(null);
+ });
  function lines(text,maximum){
   const output=[];
   let line='';
