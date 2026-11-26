@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PEF Design · Test de l’alerte</title>
+<style>
+body{font:16px system-ui,sans-serif;background:#f2f2f7;color:#242424;margin:0}
+main{max-width:28rem;margin:auto;padding:1.25rem}
+article{background:white;border:1px solid #e5e5ea;border-radius:14px;padding:1.25rem}
+button,input{font:inherit;padding:.65rem}
+button{border:1px solid #555;border-radius:.5rem;background:white;color:inherit;cursor:pointer}
+input,label{display:block;margin:.5rem 0}
+</style>
+<main>
+<h1>PEF Design</h1>
+<p>Fiche exemple · Simulation</p>
+<article>
+<h2>Applique murale</h2>
+<p>Luminaires · Lisbonne</p>
+<button disabled>WhatsApp</button>
+<p><button id="open" type="button" aria-controls="alert-form" aria-expanded="false">Créer une alerte pour ce type d’objet</button></p>
+<form id="alert-form" hidden>
+<label for="email">Ton e-mail</label>
+<input id="email" type="email" required autocomplete="off" placeholder="test@example.com">
+<button type="submit">Tester l’alerte</button>
+</form>
+<p id="result" role="status"></p>
+</article>
+</main>
+<script>
+const button = document.querySelector('#open');
+const form = document.querySelector('#alert-form');
+button.addEventListener('click', () => {
+  form.hidden = false;
+  button.setAttribute('aria-expanded', 'true');
+  document.querySelector('#email').focus();
+});
+form.addEventListener('submit', (event) => {
+  event.preventDefault();
+  form.reset();
+  document.querySelector('#result').textContent = 'Simulation terminée. Aucun e-mail envoyé, aucune alerte enregistrée.';
+});
+</script>
+</html>
