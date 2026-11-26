@@ -1810,6 +1810,7 @@ async function publish(){
   return data;
  }
  const stage='/api/listings/stage/'+pefPostDraftId;
+ let step='Preparing video';
  try{
   let video,seconds=Number(fields.trimStart)||0;
   if(original){
@@ -1819,6 +1820,7 @@ async function publish(){
    video=await convertForPEF(original,seconds,message=>{button.textContent=message},selectedMusic,originalVolume,getMusicVolume());
    seconds=0;
   }
+  step='Uploading photos';
   button.textContent='Uploading photos…';
   const urls=[];
   for(const file of photos){
@@ -1833,15 +1835,18 @@ async function publish(){
   }
   let videoUrl='';
   if(video){
+   step='Uploading video';
    button.textContent='Uploading video…';
    videoUrl=(await request(stage,video.type.split(';')[0],video)).url;
   }
+  step='Publishing listing';
   button.textContent='Publishing…';
   const result=await request('/api/listings','application/json',JSON.stringify({
    draftId:pefPostDraftId,title,description,price:fields.price,category:fields.category,
    city:fields.city.trim(),country:fields.country.trim(),whatsapp,photos:urls,video_url:videoUrl,
    trim_start:seconds,object_date:formatObjectDate(fields.itemYear),negotiable:fields.negotiable,trade:fields.acceptTrade,
   }));
+  step='Opening published listing';
   saveSellerPreferences();
   removeSelectedVideo();pefSelectedPhotoFiles=[];pefSyncPhotoInput();pefRenderSelectedPhotos();
   for(const id of ['name','description','price','itemYear'])document.getElementById(id).value='';
@@ -1857,7 +1862,9 @@ async function publish(){
    alert('Listing saved and awaiting moderation.');
   }
  }catch(error){
-  alert(error.message||'Publication failed. Your draft is saved.');
+  const reason=typeof error==='string'?error:error?.message;
+  console.warn('PEF Post:',step,error);
+  alert(error?.expired?reason:step+' failed. '+(reason||'No error detail returned.'));
   if(error.expired)show('profile');
  }finally{
   editor.inert=false;button.disabled=false;button.textContent='Post';
