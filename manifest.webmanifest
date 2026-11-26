@@ -8,8 +8,8 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/Ico%CC%82ne%20PEF%20Design%20be%CC%82ta.png",
-      "sizes": "any",
+      "src": "/assets/branding/favicon-v6.png",
+      "sizes": "1236x1236",
       "type": "image/png",
       "purpose": "any"
     }
