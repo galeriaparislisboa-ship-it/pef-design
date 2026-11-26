@@ -1,0 +1,19 @@
+#pefCloudflareProfile.cf-admin-profile{width:min(100%,960px);max-width:960px}
+.pef-moderation{color:#1c1c1e;background:#f5f5f7;border-radius:16px;padding:16px;font:14px/1.45 -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+.pef-moderation nav,.pef-moderation>div:nth-child(2),.pef-moderation .pef-decision{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.pef-moderation nav{position:static;background:none;width:auto;height:auto;transform:none;inset:auto;box-shadow:none;border:0}
+.pef-moderation button,.pef-moderation input,.pef-moderation select,.pef-moderation textarea{font:inherit;min-height:40px;border:1px solid #d8d8dc;border-radius:9px;background:#fff;color:#1c1c1e;padding:8px 12px;max-width:100%;box-sizing:border-box}
+.pef-moderation button[aria-pressed=true]{background:#d7ebff;border-color:#96c0eb;font-weight:650}
+.pef-moderation button:disabled{opacity:.6}
+.pef-moderation details{background:#fff;border:1px solid #e5e5ea;border-radius:12px;margin:6px 0;overflow-wrap:anywhere}
+.pef-moderation summary{padding:12px;cursor:pointer}
+.pef-moderation summary small{display:block;margin:3px 0 0 15px;color:#606066}
+.pef-moderation details>div{padding:4px 12px 12px}
+.pef-moderation .pef-decision textarea{flex:1 1 100%}
+.pef-verification-cloudflare form{display:grid;gap:8px;padding:10px}
+.pef-verification-cloudflare label{display:grid;gap:4px}
+.app:has(#profile:not(.hidden) .cf-admin-profile) > .top{display:none}
+#profile:has(.cf-admin-profile){padding-top:max(16px,env(safe-area-inset-top));padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+#pefCloudflareProfile .pef-moderation nav button[aria-pressed="false"]{background:#fff;border:1px solid #d8d8dc}
+#pefCloudflareProfile .pef-moderation nav button[aria-pressed="true"]{background:#a8cff1;border:1px solid #719ec5}
+#pefCloudflareProfile .pef-moderation input[type="search"]{background:#fff;color:#1c1c1e;width:100%}
