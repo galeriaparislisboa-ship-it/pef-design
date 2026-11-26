@@ -1662,8 +1662,73 @@ function prepareTrimPreview(start=0,persist=true){const file=document.getElement
 function updateTrimStart(){const slider=document.getElementById('trimStart'),n=Number(slider.value)||0,d=Math.max(trimDuration,10),w=document.getElementById('trimWindow');document.getElementById('trimStartLabel').textContent=n.toFixed(1).replace('.',',')+' – '+(n+10).toFixed(1).replace('.',',')+' s';w.style.left=(n/d*100)+'%';w.style.width=(10/d*100)+'%';const v=document.getElementById('trimPreview');clearTimeout(trimPreviewTimer);if(v.readyState>=1){v.pause();v.currentTime=n}savePendingDraft()}
 (function(){const track=document.getElementById('trimTrack');let pointer=null,origin=0,start=0;track.addEventListener('pointerdown',e=>{if(trimDuration<=10)return;pointer=e.pointerId;origin=e.clientX;start=Number(document.getElementById('trimStart').value)||0;track.setPointerCapture(pointer);e.preventDefault()});track.addEventListener('pointermove',e=>{if(pointer!==e.pointerId)return;const slider=document.getElementById('trimStart');slider.value=Math.max(0,Math.min(trimDuration-10,start+(e.clientX-origin)/track.getBoundingClientRect().width*trimDuration));updateTrimStart()});const end=e=>{if(e.pointerId===pointer)pointer=null};track.addEventListener('pointerup',end);track.addEventListener('pointercancel',end)})();
 async function previewTrimSelection(){const v=document.getElementById('trimPreview');if(!Number.isFinite(v.duration)||v.duration<10)return alert('Choose a video at least 10 seconds long.');clearTimeout(trimPreviewTimer);v.pause();v.currentTime=Number(document.getElementById('trimStart').value)||0;v.volume=getOriginalVolume();v.muted=getOriginalVolume()===0;previewPEFMusic();try{await v.play();trimPreviewTimer=setTimeout(()=>{v.pause();stopMusicPreview()},10000)}catch(e){stopMusicPreview();alert('Unable to start the preview on this phone.')}}
-async function trimVideoToTenSeconds(file,start=0,musicChoice="original",originalVolume=1,musicVolume=.30){const video=document.createElement('video'),url=URL.createObjectURL(file);let stream=null,recorder=null,timer=null,audioCtx=null;const limit=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label)),ms)})]).finally(()=>{clearTimeout(timer);timer=null});video.src=url;video.muted=false;video.volume=originalVolume;video.playsInline=true;video.preload='auto';try{await limit(new Promise((ok,fail)=>{video.onloadedmetadata=ok;video.onerror=()=>fail(new Error('Unreadable video'))}),12000,'Video loading timed out');if(!Number.isFinite(video.duration)||video.duration<10)throw Error('The video must be at least 10 seconds long.');if(typeof video.captureStream!=='function'||typeof MediaRecorder==='undefined')return null;const selected=Math.max(0,Math.min(Number(start)||0,video.duration-10));video.currentTime=selected;await limit(new Promise((ok,fail)=>{if(Math.abs(video.currentTime-selected)<0.15&&video.readyState>=2)return ok();video.onseeked=ok;video.onerror=()=>fail(Error('Unable to seek in video'))}),12000,'Video selection timed out');stream=video.captureStream();/* Re-encode frames through a portrait canvas so iPhone MOV rotation metadata cannot be lost by MediaRecorder. */if(typeof HTMLCanvasElement!=='undefined'&&HTMLCanvasElement.prototype.captureStream){const w=video.videoWidth,h=video.videoHeight;if(w>0&&h>0){const portrait=w<=h;const canvas=document.createElement('canvas');canvas.width=portrait?w:h;canvas.height=portrait?h:w;const ctx=canvas.getContext('2d',{alpha:false});if(ctx){const originalStream=stream;let drawing=true;const draw=()=>{if(!drawing)return;ctx.save();if(!portrait){ctx.translate(canvas.width,0);ctx.rotate(Math.PI/2);ctx.drawImage(video,0,0,w,h)}else ctx.drawImage(video,0,0,canvas.width,canvas.height);ctx.restore();requestAnimationFrame(draw)};draw();const canvasStream=canvas.captureStream(30);stream=new MediaStream([...canvasStream.getVideoTracks(),...originalStream.getAudioTracks()]);video.addEventListener('pause',()=>{drawing=false},{once:true});}}}if(musicChoice!=='original'||originalVolume!==1){audioCtx=new (window.AudioContext||window.webkitAudioContext)();const dest=audioCtx.createMediaStreamDestination();const originalAudio=stream.getAudioTracks();if(originalAudio.length){const src=audioCtx.createMediaStreamSource(new MediaStream(originalAudio));const originalGain=audioCtx.createGain();originalGain.gain.value=originalVolume;src.connect(originalGain);originalGain.connect(dest)}if(musicChoice!=='original'){const response=await fetch(PEF_TRACKS[musicChoice]);if(!response.ok)throw Error('Musique introuvable');const musicBuffer=await audioCtx.decodeAudioData(await response.arrayBuffer());const source=audioCtx.createBufferSource(),musicGain=audioCtx.createGain();source.buffer=musicBuffer;source.loop=true;musicGain.gain.value=musicVolume;source.connect(musicGain);musicGain.connect(dest);source.start()}stream=new MediaStream([...stream.getVideoTracks(),...dest.stream.getAudioTracks()])}const preferred=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp8,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));if(!preferred)return null;recorder=new MediaRecorder(stream,{mimeType:preferred});const chunks=[];recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};const done=new Promise((ok,fail)=>{recorder.onstop=()=>ok(new Blob(chunks,{type:recorder.mimeType}));recorder.onerror=()=>fail(Error('Unable to record video'))});recorder.start(1000);await limit(video.play(),8000,'Unable to play video');await limit(new Promise(resolve=>setTimeout(resolve,10200)),16000,'Video trimming timed out');if(recorder.state!=='inactive')recorder.stop();video.pause();const blob=await limit(done,7000,'Video finalization timed out');if(!blob.size)throw Error('Decorupage vide');const ext=blob.type.includes('mp4')?'mp4':'webm';return new File([blob],'pef-10s.'+ext,{type:blob.type})}finally{clearTimeout(timer);video.pause();if(recorder&&recorder.state!=='inactive')try{recorder.stop()}catch{}if(stream)stream.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close().catch(()=>{});URL.revokeObjectURL(url)}}
-async function convertForPEF(file,start,onProgress,musicChoice="original",originalVolume=1,musicVolume=.30){if(file.size>80*1024*1024)throw Error('Video too large to convert on this phone (80 MB maximum).');onProgress('Chargement du convertisseur…');const base='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd';const core='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';const toBlobURL=async(url,type)=>URL.createObjectURL(new Blob([await (async()=>{const res=await fetch(url);if(!res.ok)throw Error('Convertisseur indisponible');return res.arrayBuffer()})()],{type}));if(!window.FFmpegWASM){await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=base+'/ffmpeg.js';s.onload=resolve;s.onerror=()=>reject(Error('Unable to load video converter'));document.head.appendChild(s)})}const ff=new window.FFmpegWASM.FFmpeg();let workerURL,coreURL,wasmURL;try{workerURL=await toBlobURL(base+'/814.ffmpeg.js','text/javascript');coreURL=await toBlobURL(core+'/ffmpeg-core.js','text/javascript');wasmURL=await toBlobURL(core+'/ffmpeg-core.wasm','application/wasm');ff.on('progress',({progress})=>{if(Number.isFinite(progress))onProgress('MP4 conversion: '+Math.min(99,Math.max(0,Math.round(progress*100)))+' %')});onProgress('Preparing video…');await ff.load({coreURL,wasmURL,classWorkerURL:workerURL});await ff.writeFile('input'+(file.name.toLowerCase().endsWith('.mov')?'.mov':'.mp4'),new Uint8Array(await file.arrayBuffer()));onProgress('Conversion MP4 en cours…');const input='input'+(file.name.toLowerCase().endsWith('.mov')?'.mov':'.mp4');if(musicChoice!=='original'){const musicResponse=await fetch(PEF_TRACKS[musicChoice]);if(!musicResponse.ok)throw Error('Musique MP3 introuvable');await ff.writeFile('music.mp3',new Uint8Array(await musicResponse.arrayBuffer()));try{await ff.exec(['-ss',String(Math.max(0,start)),'-i',input,'-i','music.mp3','-t','10','-filter_complex','[0:a]volume='+originalVolume+'[a];[1:a]volume='+musicVolume+'[bg];[a][bg]amix=inputs=2:duration=first:normalize=0[m]','-map','0:v:0','-map','[m]','-c:v','libx264','-preset','ultrafast','-vf','scale=trunc(min(1080,iw)/2)*2:-2','-b:v','2500k','-maxrate','3000k','-bufsize','3000k','-pix_fmt','yuv420p','-c:a','aac','-b:a','96k','-movflags','+faststart','output.mp4'])}catch(e){throw Error('Unable to mix music with the original audio on this device.')}}else{await ff.exec(['-ss',String(Math.max(0,start)),'-i',input,'-t','10',...(originalVolume===1?[]:['-af','volume='+originalVolume]),'-c:v','libx264','-preset','ultrafast','-vf','scale=trunc(min(1080,iw)/2)*2:-2','-b:v','2500k','-maxrate','3000k','-bufsize','3000k','-pix_fmt','yuv420p','-c:a','aac','-b:a','96k','-movflags','+faststart','output.mp4']);}const bytes=await ff.readFile('output.mp4');if(!bytes?.length)throw Error('Conversion vide');return new File([bytes],'pef-'+Date.now()+'.mp4',{type:'video/mp4'})}finally{try{ff.terminate()}catch{}for(const u of [workerURL,coreURL,wasmURL])if(u)URL.revokeObjectURL(u)}}
+let pefConverterScript;
+async function convertForPEF(file,start,onProgress,musicChoice='original',originalVolume=1,musicVolume=.30){
+ if(file.size>80*1024*1024)throw Error('Video too large to convert on this phone (80 MB maximum).');
+ const base='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd';
+ const core='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';
+ onProgress('Loading video converter…');
+ const music=musicChoice==='original'?null:await fetch(PEF_TRACKS[musicChoice])
+  .then(response=>{if(!response.ok)throw Error();return response.arrayBuffer()})
+  .catch(()=>{throw Error('The selected music is unavailable. Choose Original to publish your video.')});
+ if(!window.FFmpegWASM){
+  pefConverterScript??=new Promise((resolve,reject)=>{
+   const script=document.createElement('script');
+   script.src=base+'/ffmpeg.js';
+   script.onload=resolve;
+   script.onerror=()=>{script.remove();reject(Error('Unable to load the video converter.'))};
+   document.head.appendChild(script);
+  }).catch(error=>{pefConverterScript=null;throw error});
+  await pefConverterScript;
+ }
+ const ff=new window.FFmpegWASM.FFmpeg();
+ const urls=[];
+ const toBlobURL=async(url,type)=>{
+  const response=await fetch(url);
+  if(!response.ok)throw Error('Unable to load the video converter.');
+  const blobURL=URL.createObjectURL(new Blob([await response.arrayBuffer()],{type}));
+  urls.push(blobURL);
+  return blobURL;
+ };
+ try{
+  const workerURL=await toBlobURL(base+'/814.ffmpeg.js','text/javascript');
+  const coreURL=await toBlobURL(core+'/ffmpeg-core.js','text/javascript');
+  const wasmURL=await toBlobURL(core+'/ffmpeg-core.wasm','application/wasm');
+  await ff.load({coreURL,wasmURL,classWorkerURL:workerURL});
+  await ff.writeFile('input-video',new Uint8Array(await file.arrayBuffer()));
+  const args=['-ss',String(Math.max(0,start)),'-i','input-video'];
+  if(music){
+   await ff.ffprobe(['-v','error','-select_streams','a:0','-show_entries','stream=index','-of','csv=p=0','-o','audio-stream.txt','input-video']);
+   const hasAudio=(await ff.readFile('audio-stream.txt','utf8')).trim()!=='';
+   await ff.writeFile('music.mp3',new Uint8Array(music));
+   args.push('-stream_loop','-1','-i','music.mp3');
+   if(hasAudio&&originalVolume>0){
+    args.push('-filter_complex','[0:a:0]volume='+originalVolume+'[original];[1:a:0]volume='+musicVolume+'[music];[original][music]amix=inputs=2:duration=longest:normalize=0[audio]',
+     '-map','0:v:0','-map','[audio]');
+   }else{
+    args.push('-map','0:v:0','-map','1:a:0','-af','volume='+musicVolume);
+   }
+  }else{
+   args.push('-map','0:v:0','-map','0:a:0?');
+   if(originalVolume===0)args.push('-an');
+   else if(originalVolume!==1)args.push('-af','volume='+originalVolume);
+  }
+  onProgress('Compressing video…');
+  ff.on('progress',({progress})=>{
+   if(Number.isFinite(progress))onProgress('MP4 conversion: '+Math.min(99,Math.max(0,Math.round(progress*100)))+' %');
+  });
+  const status=await ff.exec([...args,'-t','10','-vf',"scale=w='trunc(min(1080,iw)/2)*2':h=-2",
+   '-c:v','libx264','-preset','ultrafast','-crf','22','-maxrate','3000k','-bufsize','3000k',
+   '-pix_fmt','yuv420p','-c:a','aac','-b:a','96k','-movflags','+faststart','output.mp4']);
+  if(status!==0)throw Error('Could not convert this video to MP4.');
+  const bytes=await ff.readFile('output.mp4');
+  if(!bytes.length)throw Error('The converted video is empty.');
+  return new File([bytes],'pef-'+Date.now()+'.mp4',{type:'video/mp4'});
+ }finally{
+  ff.terminate();
+  for(const url of urls)URL.revokeObjectURL(url);
+ }
+}
 function showPEFProcessingNotice(){document.getElementById('pefProcessingNotice')?.remove();const overlay=document.createElement('div');overlay.id='pefProcessingNotice';overlay.className='pef-processing-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Video submitted');overlay.innerHTML='<div class="pef-processing-card"><div class="pef-processing-brand">PEF <span>DESIGN</span></div><div class="pef-processing-symbol">✓</div><h2>Your video<br>is on its way.</h2><p>Your video has been received and is now being processed and checked for compatibility. Once ready, your listing will be published automatically.</p><div class="pef-processing-status"><span class="pef-processing-dot"></span> VIDEO PROCESSING IN PROGRESS</div><button class="pef-processing-cta" type="button">BACK TO EXPLORE →</button><div class="pef-processing-note">You can close the app. No further action needed.</div></div>';overlay.querySelector('button').onclick=()=>overlay.remove();document.body.appendChild(overlay)}
 let pefSelectedPhotoFiles=[];
 function pefSyncPhotoInput(){const input=document.getElementById('pefPhotos');const transfer=new DataTransfer();pefSelectedPhotoFiles.forEach(file=>transfer.items.add(file));input.files=transfer.files}
@@ -1797,18 +1862,11 @@ async function publish(){
  }
  const stage='/api/listings/stage/'+pefPostDraftId;
  try{
-  let video,seconds=Number(fields.trimStart)||0;
+  let video;
   if(original){
    if(!Number.isFinite(trimDuration)||trimDuration<10)throw Error('Choose a video at least 10 seconds long.');
-   button.textContent='Preparing the video…';
-   const originalVolume=getOriginalVolume();
-   if(selectedMusic==='original'){
-    video=await convertForPEF(original,seconds,message=>{button.textContent=message},'original',originalVolume);
-   }else{
-    video=await trimVideoToTenSeconds(original,seconds,selectedMusic,originalVolume,getMusicVolume());
-    if(!video)throw Error('Could not prepare the video with the selected music. Try Original audio.');
-   }
-   seconds=0;
+   video=await convertForPEF(original,Number(fields.trimStart)||0,message=>{button.textContent=message},
+    selectedMusic,getOriginalVolume(),getMusicVolume());
   }
   button.textContent='Uploading photos…';
   const urls=[];
@@ -1831,7 +1889,7 @@ async function publish(){
   const result=await request('/api/listings','application/json',JSON.stringify({
    draftId:pefPostDraftId,title,description,price:fields.price,category:fields.category,
    city:fields.city.trim(),country:fields.country.trim(),whatsapp,photos:urls,video_url:videoUrl,
-   trim_start:seconds,object_date:formatObjectDate(fields.itemYear),negotiable:fields.negotiable,trade:fields.acceptTrade,
+   trim_start:0,object_date:formatObjectDate(fields.itemYear),negotiable:fields.negotiable,trade:fields.acceptTrade,
   }));
   saveSellerPreferences();
   removeSelectedVideo();pefSelectedPhotoFiles=[];pefSyncPhotoInput();pefRenderSelectedPhotos();
