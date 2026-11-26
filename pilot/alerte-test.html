@@ -16,10 +16,15 @@ input,label{display:block;margin:.5rem 0}
 <p>Fiche exemple · Simulation</p>
 <article>
 <h2>Applique murale</h2>
-<p>Luminaires · Lisbonne</p>
-<button disabled>WhatsApp</button>
-<p><button id="open" type="button" aria-controls="alert-form" aria-expanded="false">Créer une alerte pour ce type d’objet</button></p>
+<p>Catégorie — Luminaires<br>Ville du vendeur — Lisbonne</p>
+<button disabled>Contacter le vendeur sur WhatsApp</button>
+<p><button id="open" type="button" aria-controls="alert-form" aria-expanded="false">Créer une alerte par e-mail</button></p>
 <form id="alert-form" hidden>
+<p>Catégorie de l’alerte — Luminaires</p>
+<label>Ville (facultatif)<input name="city" type="text"></label>
+<label>Prix maximum en euros (facultatif)<input name="maxPrice" type="number" min="0" step="0.01"></label>
+<label>Style (facultatif)<input name="style" type="text" placeholder="Scandinave"></label>
+<label>Période (facultatif)<input name="period" type="text" placeholder="Années 1960–1970"></label>
 <label for="email">Ton e-mail</label>
 <input id="email" type="email" required autocomplete="off" placeholder="test@example.com">
 <button type="submit">Tester l’alerte</button>
