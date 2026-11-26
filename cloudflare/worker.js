@@ -1,5 +1,5 @@
 import {newsletters} from "./newsletters.mjs";
-import {initializeModeration, moderation, visibleListing} from "./moderation.mjs";
+import {initializeModeration, moderation, visibleListing, listingLikeCount} from "./moderation.mjs";
 import {googleAuth} from "./auth-google.js";
 import {issueCode,consumeCode} from "./auth-email-code.mjs";
 // PEF Design Cloudflare Worker — independent password authentication.
@@ -128,11 +128,42 @@ export default {
    await env.MEDIA.put('gallery/paris-lisboa/profile.json',JSON.stringify(result));
    return out({ok:true,deletionRequestedAt:result.deletionRequestedAt});
   }
+  if(path==='/api/likes'&&(method==='GET'||method==='PATCH')){
+   if(!env.DB)return out({error:'Database unavailable'},503);
+   try{
+    const user=await authorize(request,env);
+    if(!user)return out({error:'Unauthorized'},401);
+    await initializeModeration(env.DB);
+    const account=await env.DB.prepare('SELECT id FROM users WHERE lower(email)=?').bind(user.email.toLowerCase()).first();
+    if(!account)return out({error:'Account not found'},403);
+    const likedIds=env.DB.prepare('SELECT listing_id FROM pef_listing_likes WHERE user_id=?').bind(account.id);
+    if(method==='GET'){
+     const {results}=await likedIds.all();
+     return out({ids:results.map(row=>row.listing_id)});
+    }
+    const {changes}=await request.json().catch(()=>null)||{};
+    if(!Array.isArray(changes)||!changes.length||changes.length>30||changes.some(change=>
+     !change||typeof change.id!=='string'||!change.id.length||change.id.length>150||typeof change.liked!=='boolean'
+    ))return out({error:'Invalid likes'},400);
+    const changesById=new Map(changes.map(change=>[change.id,change.liked]));
+    const ids=[...changesById.keys()];
+    const writes=[...changesById].map(([id,liked])=>liked
+     ?env.DB.prepare(`INSERT OR IGNORE INTO pef_listing_likes(listing_id,user_id)
+       SELECT id,? FROM pef_objects WHERE id=? AND ${visibleListing}`).bind(account.id,id)
+     :env.DB.prepare('DELETE FROM pef_listing_likes WHERE listing_id=? AND user_id=?').bind(id,account.id));
+    const counts=env.DB.prepare(`SELECT id,${listingLikeCount} FROM pef_objects WHERE id IN (${ids.map(()=>'?').join(',')}) AND ${visibleListing}`).bind(...ids);
+    const results=await env.DB.batch([...writes,likedIds,counts]);
+    return out({ids:results.at(-2).results.map(row=>row.listing_id),counts:results.at(-1).results});
+   }catch(error){
+    console.error('Likes unavailable',error.message);
+    return out({error:'Unable to synchronize likes'},500);
+   }
+  }
   if(path==='/api/text-listings'&&method==='GET'){
    if(!env.DB)return out({error:'Database unavailable'},503);
    try{
     await initializeModeration(env.DB);
-    const result=await env.DB.prepare(`SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,likes,whatsapp_clicks,created_at,photos,video_url,media_order,trim_start,trim_end,
+    const result=await env.DB.prepare(`SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,${listingLikeCount},whatsapp_clicks,created_at,photos,video_url,media_order,trim_start,trim_end,
      (SELECT badge FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id) AS seller_badge,
      (SELECT display_name FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id AND badge<>'none') AS seller_name
      FROM pef_objects WHERE ${visibleListing} ORDER BY created_at DESC LIMIT 100`).all();
@@ -146,7 +177,8 @@ export default {
    if(!user)return out({error:'Unauthorized'},401);
    const account=await env.DB.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').bind(user.email.toLowerCase()).first();
    if(!account)return out({error:'Account not found'},403);
-   const {results}=await env.DB.prepare('SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,likes,whatsapp_clicks,created_at,photos,video_url,media_order,is_hidden FROM pef_objects WHERE seller_id=? ORDER BY created_at DESC').bind(account.id).all();
+   await initializeModeration(env.DB);
+   const {results}=await env.DB.prepare(`SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,${listingLikeCount},whatsapp_clicks,created_at,photos,video_url,media_order,is_hidden FROM pef_objects WHERE seller_id=? ORDER BY created_at DESC`).bind(account.id).all();
    return out({listings:results.map(listingWithMedia)});
   }
   if(path==='/api/listings'&&method==='POST'){

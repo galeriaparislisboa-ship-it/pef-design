@@ -1,5 +1,6 @@
 const tables = [
   "CREATE TABLE IF NOT EXISTS pef_archived_accounts (user_id TEXT PRIMARY KEY, archived_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+  "CREATE TABLE IF NOT EXISTS pef_listing_likes (listing_id TEXT NOT NULL REFERENCES pef_objects(id) ON DELETE CASCADE, user_id TEXT NOT NULL, PRIMARY KEY (listing_id,user_id))",
   "CREATE TABLE IF NOT EXISTS pef_reports (id TEXT PRIMARY KEY, object_id TEXT NOT NULL, reporter_id TEXT NOT NULL, reason TEXT NOT NULL, details TEXT, created_at TEXT)",
   "CREATE TABLE IF NOT EXISTS pef_report_reviews (report_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS pef_seller_badges (seller_id TEXT PRIMARY KEY, badge TEXT, updated_at TEXT, display_name TEXT)",
@@ -8,16 +9,19 @@ const tables = [
   "CREATE TABLE IF NOT EXISTS pef_moderation_log (id TEXT PRIMARY KEY, actor TEXT NOT NULL, target TEXT NOT NULL, action TEXT NOT NULL, note TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
 ];
 export const visibleListing = "COALESCE(is_hidden,0)=0 AND NOT EXISTS (SELECT 1 FROM pef_archived_accounts WHERE user_id=pef_objects.seller_id)";
+export const listingLikeCount = 'COALESCE(pef_objects.likes,0)+(SELECT COUNT(*) FROM pef_listing_likes WHERE listing_id=pef_objects.id) AS likes';
 let initialized;
 export function initializeModeration(db) {
-  return initialized ??= db.batch(tables.map(sql => db.prepare(sql))).catch(error => {
+  return initialized ??= db.batch(tables.map(sql => db.prepare(sql))).then(()=>
+    db.prepare('CREATE INDEX IF NOT EXISTS pef_listing_likes_user ON pef_listing_likes(user_id)').run()
+  ).catch(error => {
     initialized = undefined;
     throw error;
   });
 }
 
 const reasons = new Set(['Inappropriate content', 'Misleading listing', 'Spam', 'Other']);
-const listingColumns = 'id,seller_id,title,description,price,category,city,country,whatsapp,listing_status,promotion_price,object_date,negotiable,trade,views,likes,whatsapp_clicks,photos,video_url,media_order,is_hidden,created_at';
+const listingColumns = `id,seller_id,title,description,price,category,city,country,whatsapp,listing_status,promotion_price,object_date,negotiable,trade,views,${listingLikeCount},whatsapp_clicks,photos,video_url,media_order,is_hidden,created_at`;
 const accountQuery = `SELECT u.id,u.email,u.display_name,a.archived_at,b.badge,
   CASE WHEN p.user_id IS NOT NULL OR lower(u.email)='galeriaparislisboa@gmail.com' THEN 1 ELSE 0 END AS gallery,
   (SELECT COUNT(*) FROM pef_objects WHERE seller_id=u.id) AS listings

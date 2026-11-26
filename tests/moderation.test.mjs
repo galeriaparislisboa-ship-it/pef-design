@@ -24,6 +24,7 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
      all:async()=>({results:statement.all(...args)}),
      first:async()=>statement.get(...args)||null,
      run:async()=>({meta:statement.run(...args)}),
+     batchResult:async()=>statement.columns().length?{results:statement.all(...args)}:{meta:statement.run(...args)},
     });
     return {...bind(),bind};
    },
@@ -31,7 +32,7 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
     db.exec('BEGIN');
     try{
      const result=[];
-     for(const statement of statements)result.push(await statement.run());
+     for(const statement of statements)result.push(await statement.batchResult());
      db.exec('COMMIT');
      return result;
     }catch(error){db.exec('ROLLBACK');throw error}
@@ -58,12 +59,27 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
  assert.equal((await data()).accounts.find(row=>row.id==='seller').gallery,1);
  assert.equal((await feed()).length,undefined);
  assert.equal((await feed()).count,2);
+ db.prepare('UPDATE pef_objects SET likes=? WHERE id=?').run(3,'object');
+ const setLike=(token,id,liked)=>call('/api/likes',token,'PATCH',{changes:[{id,liked}]});
+ assert.equal((await setLike(undefined,'object',true)).status,401);
+ for(let i=0;i<2;i++){
+  const result=await setLike(buyer,'object',true);
+  assert.equal(result.status,200);
+  assert.deepEqual(await result.json(),{ids:['object'],counts:[{id:'object',likes:4}]});
+ }
+ assert.deepEqual(await (await call('/api/likes',buyer)).json(),{ids:['object']});
+ assert.deepEqual(await (await call('/api/likes',seller)).json(),{ids:[]});
+ assert.deepEqual(await (await setLike(seller,'object',true)).json(),{ids:['object'],counts:[{id:'object',likes:5}]});
+ assert.equal((await feed()).listings.find(row=>row.id==='object').likes,5);
+ assert.deepEqual(await (await setLike(buyer,'object',false)).json(),{ids:[],counts:[{id:'object',likes:4}]});
+ assert.deepEqual(await (await setLike(buyer,'missing',true)).json(),{ids:[],counts:[]});
  assert.equal((await call('/api/reports',buyer,'POST',{id:'object',reason:'Spam',details:'test report'})).status,201);
  assert.equal((await call('/api/reports',buyer,'POST',{id:'object',reason:'Spam',details:'duplicate'})).status,409);
  const report=(await data()).reports[0];
  assert.equal(report.status,'pending');
  assert.equal((await action('object','hide')).status,200);
  assert.deepEqual((await feed()).listings.map(x=>x.id),['second']);
+ assert.deepEqual(await (await setLike(buyer,'object',true)).json(),{ids:[],counts:[]});
  assert.equal((await action(report.id,'resolve')).status,200);
  assert.equal((await data()).reports[0].status,'resolved');
  assert.equal((await action(report.id,'reopen')).status,200);
