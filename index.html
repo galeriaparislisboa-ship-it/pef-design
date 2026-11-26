@@ -1647,7 +1647,7 @@ function openPEFPublicObject(id){
 }
 function contact(i){const x=items[i];if(!x.phone)return alert('WhatsApp contact is available on listings with a seller phone number.');const isOwn=!!(currentUser&&x.sellerId&&String(currentUser.id)===String(x.sellerId));if(!isOwn){if(x.remote&&sb){sb.rpc('pef_record_whatsapp_click',{p_object_id:x.id}).then(({data,error})=>{if(error){console.warn('WhatsApp click tracking:',error.message);return}if(data!==null&&data!==undefined)x.contacts=Number(data)}).catch(e=>console.warn('WhatsApp tracking:',e))}else{x.contacts=(x.contacts||0)+1;persistMetric(x)}}window.open('https://wa.me/'+x.phone.replace(/\D/g,'')+'?text='+encodeURIComponent('Hi, is your item '+x.name+' on PEF still available?'),'_blank','noopener')}
 const PEF_TRACKS=Object.fromEntries(["chill","funny","unplugged"].map(name=>[name,"https://pub-25d87ef75f664949832b3ef5c3cd0ca4.r2.dev/music/"+name+".mp3"]));let selectedMusic='original',musicPreviewContext=null,musicPreviewNodes=[],musicPreviewGain=null,musicPreviewAudio=null;
-function getOriginalVolume(){return document.getElementById('muteOriginal')?.checked?0:Number(document.getElementById('originalVolume')?.value??100)/100}
+function getOriginalVolume(){return selectedMusic!=='original'||document.getElementById('muteOriginal')?.checked?0:Number(document.getElementById('originalVolume')?.value??100)/100}
 function getMusicVolume(){return Number(document.getElementById('musicVolume')?.value??30)/100}
 function updateAudioMix(){const original=getOriginalVolume(),music=getMusicVolume(),v=document.getElementById('trimPreview');document.getElementById('originalVolumeValue').textContent=Math.round(original*100)+'%';document.getElementById('musicVolumeValue').textContent=Math.round(music*100)+'%';v.volume=original;v.muted=original===0;if(musicPreviewAudio)musicPreviewAudio.volume=music;if(selectedMusic!=='original'&&v.paused&&v.readyState>=1)previewTrimSelection()}
 function selectMusic(choice){selectedMusic=choice;const mute=document.getElementById('muteOriginal');if(mute)mute.checked=choice!=='original';document.querySelectorAll('.music-choice').forEach(b=>b.classList.toggle('selected',b.dataset.music===choice));stopMusicPreview();updateAudioMix();const v=document.getElementById('trimPreview');if(v&&v.readyState>=1&&Number.isFinite(v.duration)&&v.duration>=10){previewTrimSelection()}else if(choice!=='original'){previewPEFMusic()}}
@@ -1669,12 +1669,7 @@ if(musicChoice!=='original'){
  const musicResponse=await fetch(PEF_TRACKS[musicChoice]);if(!musicResponse.ok)throw Error('The selected music is unavailable.');
  await ff.writeFile('music.mp3',new Uint8Array(await musicResponse.arrayBuffer()));
  const musicInput=['-stream_loop','-1','-i','music.mp3'];
- if(originalVolume>0){
-  exitCode=await ff.exec(['-y',...inputArgs,...musicInput,'-filter_complex','[0:a]volume='+originalVolume+'[a];[1:a]volume='+musicVolume+'[bg];[a][bg]amix=inputs=2:duration=longest:normalize=0[m]','-map','0:v:0','-map','[m]',...outputArgs]);
- }
- if(originalVolume===0||exitCode!==0){
-  exitCode=await ff.exec(['-y',...inputArgs,...musicInput,'-map','0:v:0','-map','1:a:0','-af','volume='+musicVolume,...outputArgs]);
- }
+ exitCode=await ff.exec(['-y',...inputArgs,...musicInput,'-map','0:v:0','-map','1:a:0','-af','volume='+musicVolume,...outputArgs]);
 }else{
  exitCode=await ff.exec([...inputArgs,...(originalVolume===0?['-an']:originalVolume===1?[]:['-af','volume='+originalVolume]),...outputArgs]);
 }
@@ -1995,9 +1990,9 @@ function mountFridayMedia(row,api,headers){
   const muteOriginal=document.createElement('input');muteOriginal.type='checkbox';
   const muteLabel=document.createElement('label');muteLabel.append(muteOriginal,' Mute original audio');
   function updateVideoPreview(){galleryMusicPreview?.pause();videoPreview.querySelector('video')?.pause();videoPreview.replaceChildren();
-   const editing=!!video?.startsWith('blob:');trimLabel.hidden=muteLabel.hidden=galleryMusic.hidden=!editing;
+   const editing=!!video?.startsWith('blob:');trimLabel.hidden=galleryMusic.hidden=!editing;muteLabel.hidden=!editing||galleryMusic.value!=='original';
    if(!video)return;const v=document.createElement('video');v.src=video;v.preload=editing?'metadata':'none';v.playsInline=true;v.controls=false;v.setAttribute('playsinline','');const play=document.createElement('button');play.type='button';play.className='pef-video-play';play.innerHTML='<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5 19 12 8 18.5Z"/></svg>';play.setAttribute('aria-label','Play video');play.onclick=async()=>{try{
-    v.controls=!editing;v.muted=editing&&muteOriginal.checked;
+    v.controls=!editing;v.muted=editing&&(muteOriginal.checked||galleryMusic.value!=='original');
     if(editing&&v.readyState>=1)v.currentTime=Number(trimStart.value);
     if(editing)previewGalleryMusic();
     await v.play();play.hidden=true
@@ -2053,7 +2048,7 @@ function mountFridayMedia(row,api,headers){
   let galleryMusicPreview;
   function previewGalleryMusic(){galleryMusicPreview?.pause();if(galleryMusic.value==='original')return;galleryMusicPreview=new Audio(PEF_TRACKS[galleryMusic.value]);galleryMusicPreview.volume=.30;galleryMusicPreview.play().catch(()=>{status.textContent='Music preview unavailable'});};
   save.addEventListener('click',()=>galleryMusicPreview?.pause());
-  galleryMusic.onchange=()=>{videoPreview.querySelector('video')?.pause();previewGalleryMusic()};
+  galleryMusic.onchange=()=>{const musicSelected=galleryMusic.value!=='original';muteLabel.hidden=musicSelected;videoPreview.querySelector('video')?.pause();previewGalleryMusic()};
   actions.append(videoToggle,removeVideo,galleryMusic,muteLabel,trimLabel);
 
  card.append(instruction,grid,input,videoInput,videoPreview,addPhotos,actions,status,save);
