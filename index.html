@@ -1968,7 +1968,7 @@ function mountFridayMedia(row,api,headers){
   }
   input.onchange=()=>{const files=[...input.files];if(photos.length+files.length>5){status.textContent='Maximum 5 photos';return}for(const file of files){if(!file.type.startsWith('image/'))continue;const url=URL.createObjectURL(file);photos.push(url);pendingPhotos.push({url,file})}draw();input.value=''};
   videoToggle.onclick=()=>videoInput.click();
-  videoInput.onchange=()=>{const file=videoInput.files?.[0];if(!file)return;if(!file.type.startsWith('video/')||file.size>35*1024*1024){status.textContent='Choose an MP4 or WebM video under 35 MB';return}video=URL.createObjectURL(file);draw()};
+  videoInput.onchange=()=>{const file=videoInput.files?.[0];if(!file)return;if(!(file.type.startsWith('video/')||/\.(mov|mp4|webm)$/i.test(file.name))||file.size>80*1024*1024){status.textContent='Choose a MOV, MP4 or WebM video up to 80 MB';videoInput.value='';return}if(video?.startsWith('blob:'))URL.revokeObjectURL(video);video=URL.createObjectURL(file);draw()};
   const videoPreview=document.createElement('div');videoPreview.className='pef-ios-video-preview';
   function updateVideoPreview(){videoPreview.replaceChildren();if(!video)return;const v=document.createElement('video');v.src=video;v.preload='none';v.playsInline=true;v.controls=false;v.setAttribute('playsinline','');const play=document.createElement('button');play.type='button';play.className='pef-video-play';play.innerHTML='<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5 19 12 8 18.5Z"/></svg>';play.setAttribute('aria-label','Play video');play.onclick=async()=>{try{v.controls=true;v.muted=false;v.playsInline=true;await v.play();play.hidden=true}catch(e){status.textContent='Video playback failed: '+e.message}};v.onpause=()=>{play.hidden=false};v.onended=()=>{play.hidden=false};videoPreview.append(v,play)}
   const removeVideo=document.createElement('button');removeVideo.type='button';removeVideo.className='pef-ios-video-remove';removeVideo.innerHTML="<svg viewBox=\"0 0 24 24\" width=\"17\" height=\"17\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v6M14 11v6\"/></svg>"+' Remove video';removeVideo.onclick=()=>{video=null;draw()};
@@ -1992,7 +1992,15 @@ function mountFridayMedia(row,api,headers){
    save.disabled=true;save.innerHTML="<svg viewBox=\"0 0 24 24\" width=\"17\" height=\"17\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 4h12l3 3v13H4V4h1ZM8 4v6h8V4M8 20v-7h8v7\"/></svg>"+' Saving…';
    try{
     const urls=[];for(const url of photos){const pending=pendingPhotos.find(p=>p.url===url);urls.push(pending?await upload(pending.file,'image'):url)}
-    const videoFile=videoInput.files?.[0];const videoUrl=videoFile&&video?.startsWith('blob:')?await upload(videoFile,'video'):video;
+    const videoFile=videoInput.files?.[0];
+    let videoUrl=video;
+    if(video?.startsWith('blob:')){
+     if(!videoFile)throw Error('Choose the video again before saving');
+     const optimized=await convertForPEF(videoFile,0,message=>{status.textContent=message});
+     if(optimized.size>5*1024*1024)throw Error('Converted video exceeds 5 MB');
+     status.textContent='Uploading compressed MP4…';
+     videoUrl=await upload(optimized,'video');
+    }
     const response=await fetch(mediaEndpoint+'/media',{method:'PATCH',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({photos:urls,video_url:videoUrl})});
     if(!response.ok)throw Error((await response.json().catch(()=>null))?.error||'Media save failed');
     for(const candidate of pendingPhotos)URL.revokeObjectURL(candidate.url);
