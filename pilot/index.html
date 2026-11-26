@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEF Design · Pilote</title>
+<style>
+  body { font: 16px -apple-system, BlinkMacSystemFont, sans-serif; color: #1c1c1e; background: #f2f2f7; margin: 0; }
+  main { max-width: 42rem; padding: 1rem; margin: auto; }
+  article { padding: 1rem; margin-block: 1rem; background: white; border: 1px solid #e5e5ea; border-radius: 14px; }
+  h1 { font-size: 1.5rem; } h2 { font-size: 1.2rem; } h3 { font-size: 1rem; }
+  label { display: block; margin-block: .6rem; }
+  input, select, button { font: inherit; padding: .5rem; }
+  input:not([type=checkbox]), select { display: block; max-width: 95%; }
+  button, a { margin: .25rem .5rem .25rem 0; }
+  a { color: #182a59; } [hidden] { display: none; }
+  #message { color: #45333a; }
+</style>
+<main>
+  <h1>PEF Design</h1>
+  <p id="message" role="status"></p>
+  <div id="public-view" hidden></div>
+  <div id="controls" hidden>
+    <p>Pilote local · annonces fictives</p>
+    <article>
+      <h2>Sélection client</h2>
+      <form id="selection-form">
+        <label>Titre <input name="title" required maxlength="120" placeholder="Éclairage pour le projet Comporta"></label>
+        <div id="selection-pieces"></div>
+        <button>Enregistrer la sélection</button>
+        <button type="reset">Nouvelle sélection</button>
+      </form>
+      <div id="selections"></div>
+    </article>
+    <article>
+      <h2>Explore · Alertes de recherche</h2>
+      <form id="alert-form">
+        <label>Catégorie <select name="category"><option value="">Toutes</option><option value="Lighting">Luminaires</option><option value="Ceramics">Céramiques</option></select></label>
+        <label>Ville <input name="city" maxlength="80" placeholder="Lisbonne"></label>
+        <label>Budget maximum (€) <input name="maxPrice" type="number" min="0" step=".01" placeholder="500"></label>
+        <button>Enregistrer l’alerte</button>
+        <button type="reset">Nouvelle alerte</button>
+      </form>
+      <h3>Mes alertes</h3>
+      <div id="alerts"></div>
+    </article>
+    <article>
+      <h2>Simuler une mise à jour</h2>
+      <form id="catalog-form">
+        <label>Pièce <select name="listing"></select></label>
+        <label>Prix (€) <input name="price" type="number" required min="0" step=".01"></label>
+        <label>Disponibilité <select name="status"><option value="available">Disponible</option><option value="reserved">Réservé</option><option value="sold">Vendu</option></select></label>
+        <button>Mettre à jour</button>
+      </form>
+      <button id="new-listing" type="button">Simuler une nouvelle applique à 450 €</button>
+      <button id="generate" type="button">Simuler le récapitulatif du jour</button>
+      <div id="digest"></div>
+    </article>
+  </div>
+</main>
+<script type="module">
+  const find = id => document.getElementById(id);
+  const message = find('message');
+  const statusLabels = {available:'Disponible', reserved:'Réservé', sold:'Vendu'};
+  const categories = {Lighting:'Luminaires', Ceramics:'Céramiques'};
+  const price = new Intl.NumberFormat('fr-FR', {style:'currency', currency:'EUR'});
+  let state;
+
+  function node(tag, text) {
+    const element = document.createElement(tag);
+    if (text !== undefined) element.textContent = text;
+    return element;
+  }
+
+  function action(text, callback) {
+    const button = node('button', text);
+    button.type = 'button';
+    button.onclick = () => run(callback);
+    return button;
+  }
+
+  function link(text, url) {
+    const anchor = node('a', text);
+    anchor.href = url;
+    return anchor;
+  }
+
+  function description(item) {
+    return item.title + ' · ' + price.format(item.price) + ' · ' + statusLabels[item.status];
+  }
+
+  async function api(path, body) {
+    const response = await fetch('/api/' + path, body === undefined ? {} : {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    return data;
+  }
+
+  async function run(callback) {
+    message.textContent = '';
+    try { await callback(); } catch (error) { message.textContent = error.message; }
+  }
+
+  const selectionForm = find('selection-form');
+  const alertForm = find('alert-form');
+  const catalogForm = find('catalog-form');
+  const field = (form, name) => form.elements.namedItem(name);
+  const selectedPieces = () => [...selectionForm.querySelectorAll('input:checked')].map(input => input.value);
+
+  function updateCatalogFields() {
+    const item = state.listings.find(item => item.id === field(catalogForm, 'listing').value);
+    field(catalogForm, 'price').value = item.price;
+    field(catalogForm, 'status').value = item.status;
+  }
+
+  async function render() {
+    const selected = selectedPieces();
+    const current = field(catalogForm, 'listing').value;
+    state = await api('state');
+    find('selection-pieces').replaceChildren(...state.listings.map(item => {
+      const label = node('label');
+      const input = node('input');
+      input.type = 'checkbox';
+      input.value = item.id;
+      input.checked = selected.includes(item.id);
+      label.append(input, ' ' + description(item));
+      return label;
+    }));
+    find('selections').replaceChildren(...state.selections.map(record => {
+      const row = node('p');
+      row.append(node('strong', record.title + ' · '));
+      if (!record.active) { row.append('Lien désactivé'); return row; }
+      const url = new URL('/selection/' + record.id, location.href).href;
+      row.append(link('Voir', url), link('Partager sur WhatsApp', 'https://wa.me/?text=' + encodeURIComponent(record.title + '\n' + url)),
+        action('Modifier', () => {
+          selectionForm.dataset.id = record.id;
+          field(selectionForm, 'title').value = record.title;
+          for (const input of selectionForm.querySelectorAll('input[type=checkbox]')) input.checked = record.ids.includes(input.value);
+          field(selectionForm, 'title').focus();
+        }),
+        action('Désactiver le lien', async () => {
+          await api('selections/status', {id:record.id});
+          await render();
+        }));
+      return row;
+    }));
+    find('alerts').replaceChildren(...state.alerts.map(record => {
+      const row = node('p');
+      row.append([categories[record.category], record.city, record.maxPrice === null ? '' : '≤ ' + price.format(record.maxPrice)].filter(Boolean).join(' · ') || 'Toutes les pièces');
+      row.append(' ', action('Modifier', () => {
+        alertForm.dataset.id = record.id;
+        for (const name of ['category','city','maxPrice']) field(alertForm,name).value = record[name] ?? '';
+        field(alertForm,'category').focus();
+      }), action('Arrêter', async () => {
+        await api('alerts/stop', {id:record.id});
+        await render();
+      }));
+      return row;
+    }));
+    field(catalogForm,'listing').replaceChildren(...state.listings.map(item => {
+      const option = node('option', item.title);
+      option.value = item.id;
+      return option;
+    }));
+    if (state.listings.some(item => item.id === current)) field(catalogForm,'listing').value = current;
+    updateCatalogFields();
+    const digest = state.lastDigest;
+    find('digest').replaceChildren(...(digest ? [node('h3','Aperçu e-mail · ' + digest.day), ...digest.listings.map(item => node('p', description(item)))] : []));
+  }
+
+  function submit(form, callback) {
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      run(async () => { await callback(); await render(); });
+    });
+    form.addEventListener('reset', () => { delete form.dataset.id; });
+  }
+
+  submit(selectionForm, async () => {
+    await api('selections', {id:selectionForm.dataset.id,title:field(selectionForm,'title').value,ids:selectedPieces()});
+    selectionForm.reset();
+  });
+  submit(alertForm, async () => {
+    await api('alerts', {id:alertForm.dataset.id,category:field(alertForm,'category').value,
+      city:field(alertForm,'city').value,maxPrice:field(alertForm,'maxPrice').value === '' ? null : field(alertForm,'maxPrice').valueAsNumber});
+    alertForm.reset();
+  });
+  submit(catalogForm, () => api('catalog',{
+    id:field(catalogForm,'listing').value,price:field(catalogForm,'price').valueAsNumber,status:field(catalogForm,'status').value
+  }));
+  field(catalogForm,'listing').onchange = updateCatalogFields;
+  find('new-listing').onclick = () => run(async () => {
+    await api('catalog/new', {});
+    await render();
+    message.textContent = 'Nouvelle annonce de démonstration ajoutée.';
+  });
+  find('generate').onclick = () => run(async () => {
+    const result = await api('digest', {});
+    await render();
+    message.textContent = result.digest ? 'Aperçu généré. Aucun e-mail envoyé.' : 'Aucun nouvel aperçu pour aujourd’hui.';
+  });
+
+  await run(async () => {
+    if (location.pathname.startsWith('/selection/')) {
+      const data = await api('selection/' + encodeURIComponent(location.pathname.split('/')[2]));
+      const view = find('public-view');
+      view.append(node('h2',data.title), node('p','Galerie Paris–Lisboa · Sélection de démonstration'));
+      for (const item of data.listings) {
+        const card = node('article');
+        card.append(node('strong', description(item)));
+        view.append(card);
+      }
+      if (data.galleryPhone) {
+        const text = 'Bonjour, je vous contacte au sujet de la sélection « ' + data.title + ' ».';
+        view.append(link('Contacter sur WhatsApp', 'https://wa.me/' + data.galleryPhone + '?text=' + encodeURIComponent(text)));
+      }
+      view.hidden = false;
+    } else {
+      await render();
+      find('controls').hidden = false;
+    }
+  });
+</script>
+</html>
