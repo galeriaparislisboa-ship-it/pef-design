@@ -17,7 +17,7 @@ export function initializeModeration(db) {
 }
 
 const reasons = new Set(['Inappropriate content', 'Misleading listing', 'Spam', 'Other']);
-const listingColumns = 'id,seller_id,title,description,price,category,city,country,whatsapp,listing_status,promotion_price,object_date,negotiable,trade,views,likes,whatsapp_clicks,photos,video_url,is_hidden,created_at';
+const listingColumns = 'id,seller_id,title,description,price,category,city,country,whatsapp,listing_status,promotion_price,object_date,negotiable,trade,views,likes,whatsapp_clicks,photos,video_url,media_order,is_hidden,created_at';
 const accountQuery = `SELECT u.id,u.email,u.display_name,a.archived_at,b.badge,
   CASE WHEN p.user_id IS NOT NULL OR lower(u.email)='galeriaparislisboa@gmail.com' THEN 1 ELSE 0 END AS gallery,
   (SELECT COUNT(*) FROM pef_objects WHERE seller_id=u.id) AS listings

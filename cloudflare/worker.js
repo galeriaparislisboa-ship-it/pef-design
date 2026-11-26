@@ -23,11 +23,19 @@ async function authorize(request,env){
 }
 function validPostId(value){return typeof value==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)}
 const parseArray=(value)=>{if(Array.isArray(value))return value;if(typeof value!=='string')return [];try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[]}catch{return []}};
+function videoPosition(order){
+ const first=parseArray(order)[0];
+ return first?.type==='video'||first==='video'?1:2;
+}
+function orderedMedia(photos,video,position){
+ const media=photos.map((url,index)=>({type:'photo',url,index}));
+ if(video)media.splice(position-1,0,{type:'video',url:video});
+ return media;
+}
 function listingWithMedia(row){
  const photos=parseArray(row.photos).filter(url=>typeof url==='string'&&/^https:\/\//.test(url));
  const video=typeof row.video_url==='string'&&(/\/video\/upload\//.test(row.video_url)||/\.(mp4|webm|mov)(\?|$)/i.test(row.video_url))?row.video_url:null;
- const media=photos.map((url,index)=>({type:'photo',url,index}));
- if(video)media.splice(Math.min(1,media.length),0,{type:'video',url:video});
+ const media=orderedMedia(photos,video,videoPosition(row.media_order));
  return {...row,photos,video_url:video,media_order:parseArray(row.media_order),media};
 }
 export default {
@@ -138,7 +146,7 @@ export default {
    if(!user)return out({error:'Unauthorized'},401);
    const account=await env.DB.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').bind(user.email.toLowerCase()).first();
    if(!account)return out({error:'Account not found'},403);
-   const {results}=await env.DB.prepare('SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,likes,whatsapp_clicks,created_at,photos,video_url,is_hidden FROM pef_objects WHERE seller_id=? ORDER BY created_at DESC').bind(account.id).all();
+   const {results}=await env.DB.prepare('SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,likes,whatsapp_clicks,created_at,photos,video_url,media_order,is_hidden FROM pef_objects WHERE seller_id=? ORDER BY created_at DESC').bind(account.id).all();
    return out({listings:results.map(listingWithMedia)});
   }
   if(path==='/api/listings'&&method==='POST'){
@@ -170,8 +178,7 @@ export default {
    if(photoKeys.some(key=>!key)||(video_url&&!videoKey))return out({error:'Upload media for this draft before publishing'},400);
    const trimStart=Number(input.trim_start??0);
    if(!Number.isFinite(trimStart)||trimStart<0||trimStart>86400)return out({error:'Invalid video selection'},400);
-   const ordered=photos.map((url,index)=>({type:'photo',url,index}));
-   if(videoKey)ordered.splice(1,0,{type:'video',url:video_url});
+   const ordered=orderedMedia(photos,video_url,input.video_position===1?1:2);
    const migratedGallery=account.badge==null&&user.role==='gallery'&&user.email.toLowerCase()==='galeriaparislisboa@gmail.com'&&account.id==='f81528f3-3c3c-4590-9ee9-543f950b6884';
    const hidden=migratedGallery||['verified','professional','gallery'].includes(account.badge)?0:1;
    try{
@@ -258,7 +265,7 @@ value=String(value).trim();
    if(!account)return out({error:'Account not found'},403);
    if(stagedMatch&&!validPostId(stagedMatch[1]))return out({error:'Invalid draft identifier'},400);
    const id=stagedMatch?account.id+'_'+stagedMatch[1]:decodeURIComponent((uploadMatch||mediaMatch)[1]);
-   const existing=stagedMatch?{seller_id:account.id}:await env.DB.prepare('SELECT id,seller_id,photos,video_url FROM pef_objects WHERE id=? LIMIT 1').bind(id).first();
+   const existing=stagedMatch?{seller_id:account.id}:await env.DB.prepare('SELECT id,seller_id,photos,video_url,media_order FROM pef_objects WHERE id=? LIMIT 1').bind(id).first();
    if(!existing)return out({error:'Listing not found'},404);
    if(user.role!=='admin'&&existing.seller_id!==account.id)return out({error:'Forbidden'},403);
    if(uploadMatch||stagedMatch){
@@ -286,8 +293,10 @@ if(video && (typeof video!=='string'||!video.startsWith('https://'))) return out
    const ownPrefix=new URL('/media/listings/'+id+'/',url).toString();
    if([...photos,...(video?[video]:[])].some(p=>!allowedOld.has(p)&&!p.startsWith(ownPrefix)))return out({error:'Media must belong to this listing'},403);
    try{
-    await env.DB.prepare('UPDATE pef_objects SET photos=?,video_url=?,media_order=? WHERE id=? AND seller_id=?').bind(JSON.stringify(photos),video,JSON.stringify(photos.map((p,i)=>({type:'photo',url:p,index:i})).flatMap((entry,index)=>index===0&&video?[entry,{type:'video',url:video}]:[entry])),id,existing.seller_id).run();
-    return out({ok:true,photos,video_url:video});
+    const position=input.video_position??videoPosition(existing.media_order);
+    const media_order=orderedMedia(photos,video,position===1?1:2);
+    await env.DB.prepare('UPDATE pef_objects SET photos=?,video_url=?,media_order=? WHERE id=? AND seller_id=?').bind(JSON.stringify(photos),video,JSON.stringify(media_order),id,existing.seller_id).run();
+    return out({ok:true,photos,video_url:video,media_order});
 }catch(error){
   console.error('PEF media save error:', error?.message, error?.stack);
   return out({error:'Unable to save media'},500);
