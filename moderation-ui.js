@@ -134,13 +134,16 @@
    if(active==='accounts')return ({gallery:!!row.gallery,active:!row.archived_at,archived:!!row.archived_at,verified:row.badge&&row.badge!=='none'})[value];
    return row.status===value;
   }
-  function openEditor(host,row){
+  function openEditor(host,row,onDetailsSaved){
    const edit=el('details');edit.append(el('summary','Modifier l’annonce et ses médias'));
    edit.addEventListener('toggle',()=>{
     if(!edit.open||edit.childElementCount>1)return;
     try{
      const photos=Array.isArray(row.photos)?row.photos:JSON.parse(row.photos||'[]');
-     edit.append(editor({...row,photos,media:row.video_url?[{type:'video',url:row.video_url}]:[]}));
+     edit.append(editor({...row,photos,media:row.video_url?[{type:'video',url:row.video_url}]:[]},changes=>{
+      Object.assign(row,changes);
+      onDetailsSaved?.();
+     }));
     }catch(error){
      console.error(error);
      edit.append(el('p','Impossible d’ouvrir l’éditeur de cette annonce.'));
@@ -167,9 +170,13 @@
     let item;
     if(active==='listings'){
      const visibility=row.is_hidden?'Masquée':row.seller_archived?'Compte archivé':'Visible';
-     item=card(row.title||'Sans titre',[visibility,states[row.listing_status],row.category,name(row.seller_id)].filter(Boolean).join(' · '));
+     const listingSummary=()=>[visibility,states[row.listing_status]||states.available,Number(row.negotiable)?'Négociable':'',row.category,name(row.seller_id)].filter(Boolean).join(' · ');
+     item=card(row.title||'Sans titre',listingSummary());
      decisions(item.content,row,[row.is_hidden?'show':'hide']);
-     openEditor(item.content,row);
+     openEditor(item.content,row,()=>{
+      item.node.querySelector('summary strong').textContent=row.title;
+      item.node.querySelector('summary small').textContent=listingSummary();
+     });
     }else if(active==='accounts'){
      item=card(name(row.id),[row.gallery?'Galerie':'Compte',row.archived_at?'Archivé':'Actif',row.badge&&row.badge!=='none'?'Certifié':'',row.listings+' annonce(s)'].filter(Boolean).join(' · '));
      item.content.append(el('p',[row.email,row.id,formatDate(row.archived_at)].filter(Boolean).join(' · ')));
