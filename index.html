@@ -1676,7 +1676,7 @@ if(musicChoice!=='original'){
   exitCode=await ff.exec(['-y',...inputArgs,...musicInput,'-map','0:v:0','-map','1:a:0','-af','volume='+musicVolume,...outputArgs]);
  }
 }else{
- exitCode=await ff.exec([...inputArgs,...(originalVolume===1?[]:['-af','volume='+originalVolume]),...outputArgs]);
+ exitCode=await ff.exec([...inputArgs,...(originalVolume===0?['-an']:originalVolume===1?[]:['-af','volume='+originalVolume]),...outputArgs]);
 }
 if(exitCode!==0)throw Error('Could not convert the selected video.');const bytes=await ff.readFile('output.mp4');if(!bytes?.length)throw Error('Conversion vide');return new File([bytes],'pef-'+Date.now()+'.mp4',{type:'video/mp4'})}finally{try{ff.terminate()}catch{}for(const u of [workerURL,coreURL,wasmURL])if(u)URL.revokeObjectURL(u)}}
 function showPEFProcessingNotice(){document.getElementById('pefProcessingNotice')?.remove();const overlay=document.createElement('div');overlay.id='pefProcessingNotice';overlay.className='pef-processing-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Video submitted');overlay.innerHTML='<div class="pef-processing-card"><div class="pef-processing-brand">PEF <span>DESIGN</span></div><div class="pef-processing-symbol">✓</div><h2>Your video<br>is on its way.</h2><p>Your video has been received and is now being processed and checked for compatibility. Once ready, your listing will be published automatically.</p><div class="pef-processing-status"><span class="pef-processing-dot"></span> VIDEO PROCESSING IN PROGRESS</div><button class="pef-processing-cta" type="button">BACK TO EXPLORE →</button><div class="pef-processing-note">You can close the app. No further action needed.</div></div>';overlay.querySelector('button').onclick=()=>overlay.remove();document.body.appendChild(overlay)}
@@ -1988,9 +1988,28 @@ function mountFridayMedia(row,api,headers){
   }
   input.onchange=()=>{const files=[...input.files];if(photos.length+files.length>5){status.textContent='Maximum 5 photos';return}for(const file of files){if(!file.type.startsWith('image/'))continue;const url=URL.createObjectURL(file);photos.push(url);pendingPhotos.push({url,file})}draw();input.value=''};
   videoToggle.onclick=()=>videoInput.click();
-  videoInput.onchange=()=>{const file=videoInput.files?.[0];if(!file)return;if(!(file.type.startsWith('video/')||/\.(mov|mp4|webm)$/i.test(file.name))||file.size>80*1024*1024){status.textContent='Choose a MOV, MP4 or WebM video up to 80 MB';videoInput.value='';return}if(video?.startsWith('blob:'))URL.revokeObjectURL(video);video=URL.createObjectURL(file);draw()};
+  videoInput.onchange=()=>{const file=videoInput.files?.[0];if(!file)return;if(!(file.type.startsWith('video/')||/\.(mov|mp4|webm)$/i.test(file.name))||file.size>80*1024*1024){status.textContent='Choose a MOV, MP4 or WebM video up to 80 MB';videoInput.value='';return}if(video?.startsWith('blob:'))URL.revokeObjectURL(video);video=URL.createObjectURL(file);trimStart.value='0';draw()};
   const videoPreview=document.createElement('div');videoPreview.className='pef-ios-video-preview';
-  function updateVideoPreview(){videoPreview.replaceChildren();if(!video)return;const v=document.createElement('video');v.src=video;v.preload='none';v.playsInline=true;v.controls=false;v.setAttribute('playsinline','');const play=document.createElement('button');play.type='button';play.className='pef-video-play';play.innerHTML='<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5 19 12 8 18.5Z"/></svg>';play.setAttribute('aria-label','Play video');play.onclick=async()=>{try{v.controls=true;v.muted=false;v.playsInline=true;await v.play();play.hidden=true}catch(e){status.textContent='Video playback failed: '+e.message}};v.onpause=()=>{play.hidden=false};v.onended=()=>{play.hidden=false};videoPreview.append(v,play)}
+  const trimStart=document.createElement('input');trimStart.type='range';trimStart.min='0';trimStart.max='0';trimStart.step='any';trimStart.value='0';
+  const trimLabel=document.createElement('label');const trimCaption=document.createElement('span');trimCaption.textContent='Video start';trimLabel.append(trimCaption,trimStart);
+  const muteOriginal=document.createElement('input');muteOriginal.type='checkbox';
+  const muteLabel=document.createElement('label');muteLabel.append(muteOriginal,' Mute original audio');
+  function updateVideoPreview(){galleryMusicPreview?.pause();videoPreview.querySelector('video')?.pause();videoPreview.replaceChildren();
+   const editing=!!video?.startsWith('blob:');trimLabel.hidden=muteLabel.hidden=galleryMusic.hidden=!editing;
+   if(!video)return;const v=document.createElement('video');v.src=video;v.preload=editing?'metadata':'none';v.playsInline=true;v.controls=false;v.setAttribute('playsinline','');const play=document.createElement('button');play.type='button';play.className='pef-video-play';play.innerHTML='<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5 19 12 8 18.5Z"/></svg>';play.setAttribute('aria-label','Play video');play.onclick=async()=>{try{
+    v.controls=!editing;v.muted=editing&&muteOriginal.checked;
+    if(editing&&v.readyState>=1)v.currentTime=Number(trimStart.value);
+    if(editing)previewGalleryMusic();
+    await v.play();play.hidden=true
+   }catch(e){status.textContent='Video playback failed: '+e.message}};v.onpause=v.onended=()=>{play.hidden=false;galleryMusicPreview?.pause()};
+   if(editing){
+    const syncTrim=()=>{const start=Number(trimStart.value);trimCaption.textContent='Video excerpt · '+start.toFixed(1)+'–'+Math.min(start+10,v.duration).toFixed(1)+' s';};
+    v.onloadedmetadata=()=>{trimStart.max=String(Math.max(0,(Number.isFinite(v.duration)?v.duration:10)-10));trimStart.disabled=Number(trimStart.max)===0;syncTrim()};
+    trimStart.oninput=()=>{v.pause();if(v.readyState>=1)v.currentTime=Number(trimStart.value);syncTrim()};
+    muteOriginal.onchange=()=>{v.muted=muteOriginal.checked};
+    v.ontimeupdate=()=>{if(v.currentTime>=Number(trimStart.value)+10)v.pause()};
+   }
+   videoPreview.append(v,play)}
   const removeVideo=document.createElement('button');removeVideo.type='button';removeVideo.className='pef-ios-video-remove';removeVideo.innerHTML="<svg viewBox=\"0 0 24 24\" width=\"17\" height=\"17\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v6M14 11v6\"/></svg>"+' Remove video';removeVideo.onclick=()=>{video=null;draw()};
   async function upload(file,kind){
    let payload=file;
@@ -2016,7 +2035,7 @@ function mountFridayMedia(row,api,headers){
     let videoUrl=video;
     if(video?.startsWith('blob:')){
      if(!videoFile)throw Error('Choose the video again before saving');
-     const optimized=await convertForPEF(videoFile,0,message=>{status.textContent=message},galleryMusic.value,galleryMusic.value==='original'?1:0,.30);
+     const optimized=await convertForPEF(videoFile,Number(trimStart.value),message=>{status.textContent=message},galleryMusic.value,muteOriginal.checked?0:1,.30);
      if(optimized.size>5*1024*1024)throw Error('Converted video exceeds 5 MB');
      status.textContent='Uploading compressed MP4…';
      videoUrl=await upload(optimized,'video');
@@ -2032,9 +2051,10 @@ function mountFridayMedia(row,api,headers){
   const actions=document.createElement('div');actions.className='pef-ios-media-actions';const galleryMusic=document.createElement('select');galleryMusic.setAttribute('aria-label','Video soundtrack');
   for(const [value,label] of [['original','Original audio'],['chill','Chill'],['funny','Funny'],['unplugged','Unplugged']])galleryMusic.add(new Option(label,value));
   let galleryMusicPreview;
-  galleryMusic.onchange=()=>{galleryMusicPreview?.pause();if(galleryMusic.value==='original')return;galleryMusicPreview=new Audio(PEF_TRACKS[galleryMusic.value]);galleryMusicPreview.volume=.30;galleryMusicPreview.play().catch(()=>{status.textContent='Music preview unavailable'});};
+  function previewGalleryMusic(){galleryMusicPreview?.pause();if(galleryMusic.value==='original')return;galleryMusicPreview=new Audio(PEF_TRACKS[galleryMusic.value]);galleryMusicPreview.volume=.30;galleryMusicPreview.play().catch(()=>{status.textContent='Music preview unavailable'});};
   save.addEventListener('click',()=>galleryMusicPreview?.pause());
-  actions.append(videoToggle,removeVideo,galleryMusic);
+  galleryMusic.onchange=()=>{videoPreview.querySelector('video')?.pause();previewGalleryMusic()};
+  actions.append(videoToggle,removeVideo,galleryMusic,muteLabel,trimLabel);
 
  card.append(instruction,grid,input,videoInput,videoPreview,addPhotos,actions,status,save);
  draw();
