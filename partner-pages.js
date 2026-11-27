@@ -12,14 +12,19 @@
   const section = '/api/admin/partner-pages';
   const ownerSection = '/api/partners/pages';
 
+  const vintedMarkets={
+    'vinted-it':{host:'vinted.it',name:'Vinted Italy'},
+    'vinted-pt':{host:'vinted.pt',name:'Vinted Portugal'}
+  };
   function marketplaceListing(value) {
     try {
       const url=new URL(value), host=url.hostname.replace(/^www\./,'');
       if(url.protocol!=='https:'||url.username||url.password||url.port)return null;
       if(host==='etsy.com'&&/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?listing\/\d+(?:\/[^/]+)?\/?$/i.test(url.pathname))
         return {platform:'etsy',label:'View on Etsy',url:url.href};
-      if(host==='vinted.pt'&&/^\/items\/\d+(?:-[^/]+)?\/?$/.test(url.pathname))
-        return {platform:'vinted',label:'View on Vinted',url:url.href};
+      const market=Object.keys(vintedMarkets).find(key=>vintedMarkets[key].host===host);
+      if(market&&/^\/items\/\d+(?:-[^/]+)?\/?$/.test(url.pathname))
+        return {platform:market,label:'View on Vinted',url:url.href};
     }catch{}
     return null;
   }
@@ -28,16 +33,17 @@
     let url;
     try {url=new URL(value)}catch{return 'Enter a valid HTTPS URL.'}
     const host=url.hostname.replace(/^www\./,'');
-    if(!profile&&platform==='vinted'&&/^vinted\.[a-z.]+$/.test(host)&&host!=='vinted.pt')
-      return 'Flash Connect currently supports Vinted Portugal links (vinted.pt).';
+    const market=vintedMarkets[platform];
+    if(market&&['vinted.it','vinted.pt'].includes(host)&&host!==market.host)
+      return 'Use a '+market.name+' link ('+market.host+') or change Marketplace.';
     if(!profile&&marketplaceListing(value)?.platform===platform)return '';
     if(profile&&url.protocol==='https:'&&!url.username&&!url.password&&!url.port){
       const etsyShop=host==='etsy.com'&&/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?shop\/[a-z0-9]+\/?$/i.test(url.pathname);
-      const vintedMember=host==='vinted.pt'&&/^\/member\/\d+(?:-[^/]+)?\/?$/.test(url.pathname);
+      const vintedMember=host===market?.host&&/^\/member\/\d+(?:-[^/]+)?\/?$/.test(url.pathname);
       if(platform==='etsy'?etsyShop:vintedMember)return '';
     }
     if(platform==='etsy')return profile?'Enter an Etsy shop URL (/shop/…).':'Enter an Etsy listing URL (/listing/…).';
-    return profile?'Enter the Vinted seller profile URL (/member/…), not the item URL.':'Enter a Vinted Portugal item URL (/items/…).';
+    return profile?'Enter a '+market.name+' seller profile URL (/member/…).':'Enter a '+market.name+' item URL (/items/…).';
   }
   async function flashImport(url,instagramAccount='') {
     const response=await fetch('/api/flash-import?'+new URLSearchParams({url,instagramAccount}));
@@ -474,7 +480,7 @@
         platform.name='platform';
         platform.add(new Option('Manual entry',''));
         platform.add(new Option('Etsy','etsy'));
-        platform.add(new Option('Vinted','vinted'));
+        for(const [key,market] of Object.entries(vintedMarkets))platform.add(new Option(market.name,key));
         sourceLabel.append(platform);
         form.append(sourceLabel,sourceFields);
         const source=field(sourceFields,'listing_url','Listing URL',{type:'url',max:1500,required:false});
@@ -512,8 +518,9 @@
             validateLink(input,input===seller);
             clearInvalid(input);
           }
-          source.placeholder=platform.value==='etsy'?'https://www.etsy.com/listing/…':'https://www.vinted.pt/items/…';
-          seller.placeholder=platform.value==='etsy'?'https://www.etsy.com/shop/…':'https://www.vinted.pt/member/…';
+          const market=vintedMarkets[platform.value];
+          source.placeholder=market?'https://www.'+market.host+'/items/…':'https://www.etsy.com/listing/…';
+          seller.placeholder=market?'https://www.'+market.host+'/member/…':'https://www.etsy.com/shop/…';
         };
         platform.onchange=()=>{
           source.value=seller.value=importStatus.textContent='';

@@ -1,6 +1,6 @@
 const pages=new Set(['galeriaparislisboa.com','www.galeriaparislisboa.com']);
 const images=new Set([...pages,'images.squarespace-cdn.com','static1.squarespace.com']);
-const vintedPages=new Set(['www.vinted.pt','vinted.pt']);
+const vintedPages=new Set(['www.vinted.pt','vinted.pt','www.vinted.it','vinted.it']);
 const vintedImages=new Set(Array.from({length:4},(_,index)=>'images'+(index+1)+'.vinted.net'));
 const etsyPages=new Set(['www.etsy.com','etsy.com']);
 const etsyImages=new Set(['i.etsystatic.com']);
@@ -201,11 +201,11 @@ module.exports=async function handler(req,res){
   catch(error){return res.status(422).json({error:error.message||'Etsy import unavailable.'})}
  }
  const vinted=!image&&typeof input==='string'&&input.length<=2500?allowed(input,vintedPages):null;
- if(vinted&&!/^\/items\/\d+(?:-[^/]+)?\/?$/.test(vinted.pathname))return res.status(400).json({error:'Enter a Vinted Portugal listing URL.'});
+ if(vinted&&!/^\/items\/\d+(?:-[^/]+)?\/?$/.test(vinted.pathname))return res.status(400).json({error:'Enter a Vinted Portugal or Vinted Italy listing URL.'});
  if(vinted)vinted.search='';
  const hosts=image?images:vinted?vintedPages:pages;
  const url=vinted||(typeof input==='string'&&input.length<=2500?allowed(input,hosts):null);
- if(!url)return res.status(400).json({error:'Enter a Galerie Paris–Lisboa product URL, a Vinted Portugal or Etsy listing URL, or an Instagram post URL.'});
+ if(!url)return res.status(400).json({error:'Enter a Galerie Paris–Lisboa product URL, a Vinted (Portugal or Italy) or Etsy listing URL, or an Instagram post URL.'});
  try{
   if(image&&url.hostname==='images.squarespace-cdn.com')url.searchParams.set('format','1500w');
   const result=await retrieve(url,hosts,image?4*1024*1024:3*1024*1024,image?'image/jpeg,image/png,image/webp':'text/html,application/xhtml+xml');

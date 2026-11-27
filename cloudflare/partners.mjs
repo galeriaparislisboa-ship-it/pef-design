@@ -22,9 +22,9 @@ function marketplaceUrl(value,profile=false) {
       :url.pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?listing\/(\d+)(?:\/[^/]+)?\/?$/i);
     if(match)return {platform:'etsy',url:'https://www.etsy.com/'+(profile?'shop/':'listing/')+match[1]};
   }
-  if(host==='vinted.pt'){
+  if(host==='vinted.pt'||host==='vinted.it'){
     const match=url.pathname.match(profile?/^\/member\/(\d+)(?:-[^/]+)?\/?$/:/^\/items\/(\d+)(?:-[^/]+)?\/?$/);
-    if(match)return {platform:'vinted',url:'https://www.vinted.pt'+(profile?'/member/'+match[1]:url.pathname.replace(/\/$/,''))};
+    if(match)return {platform:host==='vinted.it'?'vinted-it':'vinted-pt',url:'https://www.'+host+(profile?'/member/'+match[1]:url.pathname.replace(/\/$/,''))};
   }
   return null;
 }

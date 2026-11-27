@@ -177,6 +177,16 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   assert.equal(lamp.source_url,'https://www.etsy.com/listing/4608930616');
   assert.equal(lamp.whatsapp,'');
   assert.equal(lamp.seller_profile_hidden,1);
+  const italy={name:'Vinted Studio',city:'Rome',country:'Italy',platform:'vinted-it',
+   seller_url:'https://www.vinted.it/member/42-studio'};
+  assert.equal((await call(partners,admin,'POST',{...italy,platform:'vinted-pt'})).status,400);
+  const italianSeller=await call(partners,admin,'POST',italy);
+  assert.equal(italianSeller.status,201);
+  const italianPath=partners+'/'+(await italianSeller.json()).id;
+  const vaseId=await draft('Raku vase',italianPath,'https://www.vinted.it/items/9761457841-vecchio-vaso-ceramica-raku?ref=test');
+  assert.equal((await call(italianPath+'/publish/'+vaseId,admin,'POST',{consent:'Seller confirmed permission'})).status,200);
+  assert.equal((await feed()).listings.find(row=>row.id===vaseId).source_url,'https://www.vinted.it/items/9761457841-vecchio-vaso-ceramica-raku');
+
   assert.equal(before.seller_name,profile.name);
   assert.equal(before.seller_id,pageId);
   assert.equal(before.seller_profile_hidden,1);
