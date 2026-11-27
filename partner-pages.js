@@ -439,15 +439,12 @@
       logo.append(element('summary','Partner logo'),logoEditor(path,headers,page,()=>open(id)));body.append(logo);
       if(admin&&!page.owner_id){
         const feedback=status(), link=element('input');
-        const previewLink=element('a','Open private seller page');
-        previewLink.target='_blank';previewLink.rel='noopener';previewLink.hidden=true;
         link.readOnly=true;link.hidden=true;link.setAttribute('aria-label','Private preview link');
         body.append(button('Generate private preview link',node=>run(node,feedback,async()=>{
           const result=await request(path+'/preview',headers,'POST');
           link.value=result.url;link.hidden=false;link.select();
-          previewLink.href=result.url;previewLink.hidden=false;
           return 'Private preview link valid for 7 days. Copy it to share.';
-        })),link,previewLink,button('Send takeover invitation',node=>run(node,feedback,async()=>{
+        })),link,button('Send takeover invitation',node=>run(node,feedback,async()=>{
           if(!confirm('Send the seller an invitation to take over '+page.name+'?'))return;
           await request(path+'/invite',headers,'POST');
           return 'Invitation emailed. This link is valid for 3 days.';
