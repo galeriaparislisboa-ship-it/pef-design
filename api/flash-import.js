@@ -3,7 +3,7 @@ const images=new Set([...pages,'images.squarespace-cdn.com','static1.squarespace
 function allowed(value,hosts,base){
  try{
   const url=new URL(value,base);
-  return url.protocol==='https:'&&!url.username&&!url.password&&!url.port&&hosts.has(url.hostname)?url:null;
+  return url.protocol==='https:'&&!url.username&&!url.password&&!url.port&&(hosts.has(url.hostname)||(hosts===images&&/(?:^|\.)(?:cdninstagram\.com|fbcdn\.net)$/.test(url.hostname)))?url:null;
  }catch{return null}
 }
 async function retrieve(url,hosts,max,accept){
@@ -106,15 +106,59 @@ function extract(html,base){
  if(!title||!links.size)throw Error('No product title and photos were found.');
  return {title,price:extractPrice(product,meta,html),description:plain(product?.description||meta.get('og:description')?.[0]||meta.get('description')?.[0]),photos:[...links.values()].slice(0,5)};
 }
+function instagramPost(value){
+ const url=allowed(value,new Set(['instagram.com','www.instagram.com']));
+ return url?.pathname.match(/^\/(?:p|reel)\/([A-Za-z0-9_-]+)\/?$/)?.[1];
+}
+async function importInstagram(post,handle){
+ const username=String(handle||'').trim().replace(/^@/,'');
+ if(!/^[a-z0-9_.]{1,30}$/i.test(username))throw Error('Enter the public professional Instagram account as @username.');
+ const token=(process.env.INSTAGRAM_ACCESS_TOKEN||'').trim();
+ if(!token||token.startsWith('IG'))throw Error('Instagram import requires a Meta Facebook Login token with Business Discovery access.');
+ const graph=new URL('https://graph.facebook.com/v24.0/17841434467277923');
+ const timeout=AbortSignal.timeout(8500);
+ const fields='permalink,caption,media_type,media_url,children{media_type,media_url}';
+ let cursor='';
+ for(let page=0;page<4;page++){
+  const after=cursor?'.after('+cursor+')':'';
+  graph.searchParams.set('fields','business_discovery.username('+username+'){media.limit(50)'+after+'{'+fields+'}}');
+  const response=await fetch(graph,{headers:{Authorization:'Bearer '+token},signal:timeout,redirect:'error'});
+  const data=await response.json();
+  if(!response.ok||data.error)throw Error('Meta could not read this Instagram account. Check that it is a public professional account and that Business Discovery is enabled.');
+  const media=data.business_discovery?.media;
+  const entry=media?.data?.find(item=>instagramPost(item.permalink)===post);
+  if(entry){
+   const items=entry.media_type==='CAROUSEL_ALBUM'?entry.children?.data||[]:[entry];
+   const photos=[...new Set(items.filter(item=>item.media_type==='IMAGE'&&allowed(item.media_url,images)).map(item=>item.media_url))].slice(0,5);
+   if(!photos.length)throw Error('Meta did not provide downloadable photos for this post.');
+   const caption=String(entry.caption||'').replace(/(^|\s)#[^\s#]+/g,' ').trim();
+   const lines=caption.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+   const title=lines[0]||'';
+   const description=lines.slice(1).join(' ')||title;
+   return {title,description,photos,price:null};
+  }
+  cursor=media?.paging?.cursors?.after;
+  if(!cursor||!(/^[a-z0-9_=+\/-]+$/i.test(cursor)))break;
+ }
+ throw Error('Post not found in the latest publications available for this account. Check the link and @username.');
+}
 module.exports=async function handler(req,res){
  res.setHeader('Cache-Control','private, no-store');
  res.setHeader('X-Content-Type-Options','nosniff');
  if(req.method!=='GET')return res.status(405).json({error:'Method not allowed.'});
  const image=req.query?.image==='1';
  const input=req.query?.url;
+ const post=!image&&typeof input==='string'&&input.length<=2500&&instagramPost(input);
+ if(post){
+  try{return res.status(200).json(await importInstagram(post,req.query?.instagramAccount))}
+  catch(error){
+   const message=error.name==='TimeoutError'||error instanceof TypeError?'Instagram request unavailable. Try again.':error.message;
+   return res.status(422).json({error:message||'Instagram import unavailable.'});
+  }
+ }
  const hosts=image?images:pages;
  const url=typeof input==='string'&&input.length<=2500?allowed(input,hosts):null;
- if(!url)return res.status(400).json({error:'Flash import currently supports product links from galeriaparislisboa.com.'});
+ if(!url)return res.status(400).json({error:'Enter a Galerie Paris–Lisboa product URL or an Instagram post URL.'});
  try{
   if(image&&url.hostname==='images.squarespace-cdn.com')url.searchParams.set('format','1500w');
   const result=await retrieve(url,hosts,image?4*1024*1024:3*1024*1024,image?'image/jpeg,image/png,image/webp':'text/html,application/xhtml+xml');
