@@ -45,7 +45,7 @@ export async function claimPartnerPage(db, token, email) {
 async function findPreview(db, token) {
   if (!tokenPattern.test(token || '')) return null;
   const digest=await sha(token),now=Date.now();
-  return query(db, `SELECT id,name,city,country FROM pef_partner_pages
+  return query(db, `SELECT id,name,city,country,(SELECT logo FROM pef_partner_presentation WHERE page_id=pef_partner_pages.id) AS logo FROM pef_partner_pages
     WHERE ((preview_hash=? AND preview_until>?) OR (invite_hash=? AND invite_until>?)) AND owner_id IS NULL
     AND NOT EXISTS(SELECT 1 FROM pef_archived_accounts WHERE user_id=pef_partner_pages.id)`,
     digest,now,digest,now).first();
@@ -145,6 +145,15 @@ export async function partners(request,env,user,out) {
   if (!db) return out({error:'Database unavailable'},503);
   try {
     await initializeModeration(db);
+    if (path.startsWith('/api/partners/public-profile/') && method==='GET') {
+      const owner=path.split('/').at(-1);
+      if(!idPattern.test(owner))return out({error:'Seller page unavailable'},404);
+      const profile=await query(db,`SELECT s.logo FROM pef_partner_presentation s JOIN pef_partner_pages p ON p.id=s.page_id
+        WHERE p.owner_id=? AND s.public=1 AND NOT EXISTS(SELECT 1 FROM pef_archived_accounts WHERE user_id=p.owner_id)
+        AND EXISTS(SELECT 1 FROM pef_partner_listings l JOIN pef_objects o ON o.id=l.id
+          WHERE l.page_id=p.id AND l.published_at IS NOT NULL AND o.is_hidden=0) ORDER BY p.id LIMIT 1`,owner).first();
+      return profile ? out(profile) : out({error:'Seller page unavailable'},404);
+    }
     if (path==='/api/partners/preview' && method==='GET') {
       const page = await findPreview(db,request.headers.get('Authorization')?.replace(/^Preview /,''));
       if (!page) return out({error:'This private link has expired or been replaced'},404);
@@ -179,11 +188,26 @@ export async function partners(request,env,user,out) {
     if (!user) return out({error:'Sign in to manage this page'},401);
     const [id,action,listing,...rest] = path.slice(prefix.length+1).split('/');
     if (rest.length||!idPattern.test(id)) return out({error:'Not found'},404);
-    const page = await query(db,`SELECT p.* FROM pef_partner_pages p LEFT JOIN users u ON u.id=p.owner_id
+    const page = await query(db,`SELECT p.*,s.logo,s.public FROM pef_partner_pages p LEFT JOIN users u ON u.id=p.owner_id LEFT JOIN pef_partner_presentation s ON s.page_id=p.id
       WHERE p.id=? AND (?=1 OR lower(u.email)=?) AND NOT EXISTS(SELECT 1 FROM pef_deleted_accounts d WHERE d.user_id=p.id OR d.user_id=p.owner_id)`,id,Number(admin),user.email.toLowerCase()).first();
     if (!page) return out({error:'Seller page not found'},404);
-    if (!action && method==='GET') return out({page:{id,name:page.name,city:page.city,country:page.country,whatsapp:page.whatsapp,owner_id:page.owner_id},listings:await pageListings(db,id)});
+    if (!action && method==='GET') return out({page:{id,name:page.name,city:page.city,country:page.country,whatsapp:page.whatsapp,owner_id:page.owner_id,logo:page.logo,public:Boolean(page.public)},listings:await pageListings(db,id)});
     if (method!=='POST') return out({error:'Method not allowed'},405);
+    if (action==='presentation' && !listing) {
+      const data=await request.json().catch(()=>null);
+      if(Object.hasOwn(data||{},'logo')){
+        const logo=data.logo;
+        if(logo!==null&&(typeof logo!=='string'||logo.length>180000||!/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/]+=*$/.test(logo)))
+          return out({error:'Choose a valid logo'},400);
+        await query(db,`INSERT INTO pef_partner_presentation(page_id,logo) VALUES(?,?)
+          ON CONFLICT(page_id) DO UPDATE SET logo=excluded.logo`,id,logo).run();
+        return out({ok:true});
+      }
+      if(admin||!page.owner_id||typeof data?.public!=='boolean')return out({error:'The seller must confirm the visibility of this page'},403);
+      await query(db,`INSERT INTO pef_partner_presentation(page_id,public) VALUES(?,?)
+        ON CONFLICT(page_id) DO UPDATE SET public=excluded.public`,id,Number(data.public)).run();
+      return out({ok:true});
+    }
     if (action==='profile' && !listing && !admin) {
       const data=await request.json().catch(()=>null);
       const [name,city,country,whatsapp]=['name','city','country','whatsapp'].map(key=>typeof data?.[key]==='string'?data[key].trim():'');

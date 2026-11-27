@@ -14,3 +14,19 @@
 .pef-partner-photos {display:grid;grid-template-columns:repeat(auto-fit,minmax(5rem,1fr));gap:.5rem}
 .pef-partner-photos img {display:block;width:100%;aspect-ratio:1;object-fit:contain}
 .pef-partners .pef-partner-photos img[hidden] {display:none}
+#pefCloudflareProfile .pef-partners form {gap:12px;margin:12px 0}
+#pefCloudflareProfile .pef-partners form label {gap:5px;margin:0;color:#252528;font-size:14px}
+#pefCloudflareProfile .pef-partners form :is(input,textarea,select) {margin:0;min-height:40px;padding:8px 10px;background:#fff!important;color:#222!important;border:1px solid #c7c7cd!important;box-shadow:none;font-size:14px}
+#pefCloudflareProfile .pef-partners form button {font-size:14px;min-height:36px;margin:0}
+.pef-partner-selection {list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(85px,1fr));gap:10px}
+.pef-partner-selection li {min-width:0;padding:6px;background:#f5f5f7;border:1px solid #dedee3;border-radius:9px}
+.pef-partner-selection img {display:block;width:100%;aspect-ratio:1;object-fit:contain}
+.pef-partner-selection li div {display:flex;gap:4px;justify-content:flex-end}
+#pefCloudflareProfile .pef-partner-selection li button {min-width:32px;min-height:32px;padding:0 6px;background:#fff;border:1px solid #d8d8dc}
+.pef-partner-identity {display:flex;align-items:center;gap:14px;margin:14px 0}
+.pef-partner-identity :is(h2,p) {margin:0}
+.pef-partner-identity img {width:64px;height:64px;object-fit:contain;border-radius:10px;background:#fff}
+.pef-partner-preview-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.pef-partner-preview-grid article {min-width:0}
+.pef-partner-preview-grid .pef-partner-photos {display:flex;overflow:auto;scroll-snap-type:x mandatory}
+.pef-partner-preview-grid .pef-partner-photos img {flex:0 0 100%;scroll-snap-align:start;background:#1b1b1b}

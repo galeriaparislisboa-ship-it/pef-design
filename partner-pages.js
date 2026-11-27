@@ -90,11 +90,25 @@
     };
     let photos=[];
     const selected=element('ol');
+    selected.className='pef-partner-selection';
     const draw=()=>{
       selected.replaceChildren(...photos.map((file,index)=>{
-        const row=element('li',file.name+' ');
-        if(index>0)row.append(button('Move earlier',()=>{[photos[index-1],photos[index]]=[photos[index],photos[index-1]];draw()}));
-        row.append(button('Remove',()=>{photos.splice(index,1);draw()}));
+        const row=element('li');
+        const image=element('img');
+        image.alt=file.name;
+        const url=URL.createObjectURL(file);
+        image.onload=image.onerror=()=>URL.revokeObjectURL(url);
+        image.src=url;
+        const controls=element('div');
+        const action=(symbol,label,handler)=>{
+          const control=button(symbol,handler);
+          control.setAttribute('aria-label',label);
+          control.title=label;
+          return control;
+        };
+        if(index>0)controls.append(action('↑','Move photo '+(index+1)+' earlier',()=>{[photos[index-1],photos[index]]=[photos[index],photos[index-1]];draw()}));
+        controls.append(action('×','Remove photo '+(index+1),()=>{photos.splice(index,1);draw()}));
+        row.append(image,element('small',index===0?'Cover':String(index+1)),controls);
         return row;
       }));
     };
@@ -198,6 +212,49 @@
       container.append(card);
     }
   }
+  function profileHeader(page) {
+    const header=element('header');
+    header.className='pef-partner-identity';
+    if(page.logo){
+      const logo=element('img');logo.src=page.logo;logo.alt='';header.append(logo);
+    }
+    const identity=element('div');
+    identity.append(element('h2',page.name),element('p',[page.city,page.country].filter(Boolean).join(', ')));
+    header.append(identity);
+    return header;
+  }
+  function logoEditor(path,headers,page,refresh) {
+    const form=element('form'), feedback=status(), input=element('input'), label=element('label','Partner logo');
+    input.type='file';input.accept='image/png,image/jpeg,image/webp';input.required=true;
+    label.append(input);form.append(label);
+    submit(form,'Save logo',feedback,async()=>{
+      const bitmap=await createImageBitmap(input.files[0]);
+      const canvas=element('canvas'), ratio=Math.min(1,256/Math.max(bitmap.width,bitmap.height));
+      canvas.width=Math.max(1,Math.round(bitmap.width*ratio));canvas.height=Math.max(1,Math.round(bitmap.height*ratio));
+      canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();
+      let logo=canvas.toDataURL('image/png');
+      while(logo.length>180000&&Math.max(canvas.width,canvas.height)>64){
+        const smaller=element('canvas');
+        smaller.width=Math.max(1,Math.floor(canvas.width/2));smaller.height=Math.max(1,Math.floor(canvas.height/2));
+        smaller.getContext('2d').drawImage(canvas,0,0,smaller.width,smaller.height);
+        canvas.width=smaller.width;canvas.height=smaller.height;
+        canvas.getContext('2d').drawImage(smaller,0,0);logo=canvas.toDataURL('image/png');
+      }
+      await request(path+'/presentation',headers,'POST',{logo});
+      await refresh();
+    });
+    if(page.logo)form.append(button('Remove logo',node=>run(node,feedback,async()=>{
+      await request(path+'/presentation',headers,'POST',{logo:null});await refresh();
+    })));
+    return form;
+  }
+  function renderPreview(host,page,listings,headers) {
+    host.append(profileHeader(page),element('h2','Listings'));
+    const grid=element('div');grid.className='pef-partner-preview-grid';host.append(grid);
+    showListings(grid,listings,headers);
+    if(!listings.length)host.append(element('p','No listings yet.'));
+  }
+
   async function mount(host,token,admin) {
     const headers=bearer(token), root=element(admin?'section':'details'), body=element('div'), message=status();
     root.className='pef-partners';
@@ -226,15 +283,21 @@
     async function open(id){
       const path=prefix+'/'+id;
       const {page,listings}=await request(path,headers);
-      body.replaceChildren(button('All seller pages',node=>run(node,message,list)),element('h3',page.name),element('p',page.city+', '+page.country));
+      body.replaceChildren(button('All seller pages',node=>run(node,message,list)),profileHeader(page),
+        element('p',page.public?'Public seller page':'Private seller page'));
+      const logo=element('details');
+      logo.append(element('summary','Partner logo'),logoEditor(path,headers,page,()=>open(id)));body.append(logo);
       if(admin&&!page.owner_id){
         const feedback=status(), link=element('input');
+        const previewLink=element('a','Open private seller page');
+        previewLink.target='_blank';previewLink.rel='noopener';previewLink.hidden=true;
         link.readOnly=true;link.hidden=true;link.setAttribute('aria-label','Private preview link');
         body.append(button('Generate private preview link',node=>run(node,feedback,async()=>{
           const result=await request(path+'/preview',headers,'POST');
           link.value=result.url;link.hidden=false;link.select();
+          previewLink.href=result.url;previewLink.hidden=false;
           return 'Private preview link valid for 7 days. Copy it to share.';
-        })),link,button('Send takeover invitation',node=>run(node,feedback,async()=>{
+        })),link,previewLink,button('Send takeover invitation',node=>run(node,feedback,async()=>{
           if(!confirm('Send the seller an invitation to take over '+page.name+'?'))return;
           await request(path+'/invite',headers,'POST');
           return 'Invitation emailed. This link is valid for 3 days.';
@@ -243,6 +306,11 @@
         draft.append(element('summary','New listing draft'),draftForm(path,headers,()=>open(id)));body.append(draft);
       }
       if(!admin){
+        const visibility=status();
+        body.append(button(page.public?'Hide seller page':'Confirm and publish seller page',node=>run(node,visibility,async()=>{
+          await request(path+'/presentation',headers,'POST',{public:!page.public});
+          await open(id);await window.loadRemote?.();
+        })),visibility);
         const details=element('details'), form=element('form');
         profileFields(form,page);
         submit(form,'Save profile and listing contact',status(),async()=>{
@@ -276,10 +344,8 @@
       const headers={Authorization:'Preview '+preview};
       try{
         const {page,listings}=await request('/api/partners/preview',headers);
-        heading.textContent=page.name;
-        host.append(element('p',page.city+', '+page.country),element('h2','Listings'));
-        showListings(host,listings,headers);
-        if(!listings.length)host.append(element('p','No listings yet.'));
+        heading.hidden=true;
+        renderPreview(host,page,listings,headers);
       }catch(error){feedback.textContent=error.message}
       return;
     }
@@ -320,8 +386,7 @@
     try{
       const {page,listings}=await request('/api/partners/preview',headers);
       heading.textContent='Take over '+page.name;
-      host.append(element('p',page.city+', '+page.country));
-      showListings(host,listings,headers);
+      renderPreview(host,page,listings,headers);
     }catch(error){feedback.textContent=error.message}
   }
 

@@ -181,7 +181,10 @@ export default {
     const result=await env.DB.prepare(`SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,${listingLikeCount},whatsapp_clicks,created_at,photos,video_url,media_order,trim_start,trim_end,
      (SELECT badge FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id) AS seller_badge,
      COALESCE((SELECT p.name FROM pef_partner_listings l JOIN pef_partner_pages p ON p.id=l.page_id WHERE l.id=pef_objects.id),
-       (SELECT display_name FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id AND badge<>'none')) AS seller_name
+       (SELECT display_name FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id AND badge<>'none')) AS seller_name,
+     (SELECT CASE WHEN p.owner_id IS NULL OR COALESCE(s.public,0)=0 THEN 1 ELSE 0 END
+       FROM pef_partner_listings l JOIN pef_partner_pages p ON p.id=l.page_id
+       LEFT JOIN pef_partner_presentation s ON s.page_id=p.id WHERE l.id=pef_objects.id) AS seller_profile_hidden
      FROM pef_objects WHERE ${visibleListing} ORDER BY created_at DESC LIMIT 100`).all();
     const listings=result.results.map(listingWithMedia);
     return out({listings,count:listings.length});

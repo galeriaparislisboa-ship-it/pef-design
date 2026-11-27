@@ -135,6 +135,9 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
    assert.equal(response.status,201,await response.clone().text());
    return (await response.json()).id;
   }
+  const logo='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+  assert.equal((await call(path+'/presentation',admin,'POST',{logo})).status,200);
+  assert.equal((await call(path+'/presentation',admin,'POST',{public:true})).status,403);
   const publicId=await draft('First listing'), privateId=await draft('Second listing');
   const privateResponse=await call(path+'/preview',admin,'POST');
   assert.equal(privateResponse.status,200);
@@ -145,6 +148,7 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   const previewData=await (await preview(previewToken)).json();
   assert.equal(previewData.listings.length,2);
   assert.equal(previewData.page.email,undefined);
+  assert.equal(previewData.page.logo,logo);
   const media=previewData.listings.find(row=>row.id===publicId).photos[0];
   assert.equal((await worker.fetch(new Request(media),env)).status,404);
   assert.equal((await worker.fetch(new Request(media,{headers:{Authorization:'Preview '+previewToken}}),env)).status,200);
@@ -154,6 +158,7 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   const before=(await feed()).listings.find(row=>row.id===publicId);
   assert.equal(before.seller_name,profile.name);
   assert.equal(before.seller_id,pageId);
+  assert.equal(before.seller_profile_hidden,1);
   assert.equal((await feed()).listings.some(row=>row.id===privateId),false);
   assert.equal((await worker.fetch(new Request(media),env)).status,200);
   db.prepare('UPDATE pef_objects SET likes=4,views=23 WHERE id=?').run(publicId);
@@ -175,6 +180,14 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   const mine=await (await call('/api/listings/mine',owner)).json();
   assert.deepEqual(new Set(mine.listings.map(row=>row.id)),new Set([publicId,privateId]));
   const ownerPath='/api/partners/pages/'+pageId;
+  const publicPage='/api/partners/public-profile/'+publishedAfter.seller_id;
+  assert.equal(publishedAfter.seller_profile_hidden,1);
+  assert.equal((await call(publicPage)).status,404);
+  assert.equal((await call(ownerPath+'/presentation',owner,'POST',{public:true})).status,200);
+  assert.equal((await call(publicPage)).status,200);
+  assert.equal((await feed()).listings.find(row=>row.id===publicId).seller_profile_hidden,0);
+  assert.equal((await call(ownerPath+'/presentation',owner,'POST',{public:false})).status,200);
+  assert.equal((await call(publicPage)).status,404);
   assert.equal((await call(ownerPath,buyer)).status,404);
   assert.equal((await call(ownerPath+'/profile',owner,'POST',{...profile,whatsapp:'+351920000000'})).status,200);
   assert.equal((await call(ownerPath+'/publish/'+privateId,owner,'POST',{})).status,200);
