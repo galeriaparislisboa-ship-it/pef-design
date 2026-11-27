@@ -822,7 +822,7 @@ transform:none!important;
 .pef-like-button svg{fill:none}.pef-like-button[aria-pressed="true"] svg{fill:currentColor}
 .pef-like-button small{font-size:10px;line-height:1;color:inherit;font-variant-numeric:tabular-nums}
 .side .pef-like-button{gap:2px;padding:3px 6px}
-</style><link rel="stylesheet" href="/moderation-ui.css?v=2"><link rel="stylesheet" href="/partner-pages.css"><script src="/partner-pages.js"></script><script src="/moderation-ui.js?v=4"></script><style>.pef-newsletter{width:min(96vw,1060px);max-height:90dvh;box-sizing:border-box;border:1px solid #ccc;border-radius:20px;background:#f5f5f5;color:#222;padding:20px;font:14px/1.4 system-ui;overflow:auto}
+</style><link rel="stylesheet" href="/moderation-ui.css?v=3"><link rel="stylesheet" href="/partner-pages.css"><script src="/partner-pages.js?v=2"></script><script src="/moderation-ui.js?v=5"></script><style>.pef-newsletter{width:min(96vw,1060px);max-height:90dvh;box-sizing:border-box;border:1px solid #ccc;border-radius:20px;background:#f5f5f5;color:#222;padding:20px;font:14px/1.4 system-ui;overflow:auto}
 .pef-newsletter::backdrop{background:#000b}
 .pef-newsletter header,.pef-newsletter-preview,.pef-newsletter-actions,.pef-newsletter-piece{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pef-newsletter header{margin-bottom:12px}
@@ -2356,9 +2356,10 @@ async function openCloudflareProfile(token){
  const legacyAdmin=document.getElementById('pefAdminPanel');
  if(legacyAdmin)legacyAdmin.style.display='none';
  panel.classList.toggle('cf-admin-profile',account.role==='admin');
- if(['admin','seller'].includes(account.role))void window.pefPartners.mount(panel,token,account.role==='admin');
+ if(account.role==='seller')void window.pefPartners.mount(panel,token,false);
  if(account.role==='admin'){
-  window.pefModeration.mount(list,token,(row,onDetailsSaved)=>fridayGalleryListing(row,api,headers,null,onDetailsSaved),loadRemote);
+  window.pefModeration.mount(list,token,(row,onDetailsSaved)=>fridayGalleryListing(row,api,headers,null,onDetailsSaved),loadRemote,
+   container=>window.pefPartners.mount(container,token,true));
   return;
  }
  if(account.role==='seller'){

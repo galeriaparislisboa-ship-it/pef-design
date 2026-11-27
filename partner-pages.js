@@ -199,9 +199,9 @@
     }
   }
   async function mount(host,token,admin) {
-    const headers=bearer(token), root=element('details'), body=element('div'), message=status();
+    const headers=bearer(token), root=element(admin?'section':'details'), body=element('div'), message=status();
     root.className='pef-partners';
-    root.append(element('summary',admin?'Vendors · Provisional pages':'My seller pages'),body,message);
+    root.append(element(admin?'h2':'summary',admin?'Provisional Seller Pages':'My seller pages'),body,message);
     host.prepend(root);
     const prefix=admin?section:ownerSection;
     async function list(){
@@ -256,13 +256,16 @@
       showListings(body,listings,headers,path,admin,()=>open(id));
       if(!listings.length)body.append(element('p','No listings yet.'));
     }
+    if(admin){
+      const retry=button('Reload seller pages',node=>run(node,message,async()=>{await list();retry.remove()}));
+      try{await list()}catch(error){message.textContent=error.message;root.append(retry)}
+      return;
+    }
     root.addEventListener('toggle',()=>{
       if(root.open&&!body.childElementCount)list().catch(error=>{message.textContent=error.message});
     });
-    if(!admin){
-      try{const {pages}=await request(prefix,headers);if(!pages.length)root.remove()}
-      catch{root.remove()}
-    }
+    try{const {pages}=await request(prefix,headers);if(!pages.length)root.remove()}
+    catch{root.remove()}
   }
 
   async function onboarding(host) {

@@ -46,18 +46,19 @@
    };
   }catch(error){status.textContent=error.message}
  }
- function mount(host,token,editor,reloadFeed){
+ function mount(host,token,editor,reloadFeed,mountPartners){
   host.classList.add('pef-moderation');
   const path='/api/admin/moderation';
   const nav=el('nav'), controls=el('div'), list=el('div'), feedback=statusLine();
   const search=Object.assign(el('input'),{type:'search',placeholder:'Rechercher'});
   search.setAttribute('aria-label','Rechercher dans la section');
-  let active='listings',data,busy=false,category,filter,order,sellerFilter;
+  let active='listings',data,busy=false,category,filter,order,sellerFilter,showingPartners=false;
   const titles={listings:'Annonces',accounts:'Comptes',reports:'Signalements',requests:'Certifications',history:'Historique'};
   const pending=rows=>rows.filter(row=>row.status==='pending').length;
   const formatDate=value=>value?new Date(value.replace(' ','T')+(value.includes('T')?'':'Z')).toLocaleString('fr-FR'):'';
   const name=id=>{const account=data.accounts.find(row=>row.id===id);return account?.display_name||account?.email||id||'Compte inconnu'};
   function selectSection(key,sellerId){
+   selectPartners(false);
    active=key;
    sellerFilter=sellerId;
    search.value='';
@@ -69,6 +70,21 @@
    const tab=button(title,()=>selectSection(key));
    nav.append(tab);return [key,tab];
   }));
+  const partnerPanel=el('div');
+  partnerPanel.hidden=true;
+  const partnerTab=button('Provisional Seller Pages',()=>{
+   selectPartners(true);
+   if(!partnerPanel.childElementCount)void mountPartners(partnerPanel);
+  });
+  partnerTab.setAttribute('aria-pressed','false');
+  if(mountPartners)nav.append(partnerTab);
+  function selectPartners(selected){
+   showingPartners=selected;
+   partnerPanel.hidden=!selected;
+   for(const node of [controls,feedback,list])node.hidden=selected;
+   partnerTab.setAttribute('aria-pressed',String(selected));
+   for(const [key,tab] of Object.entries(tabButtons))tab.setAttribute('aria-pressed',String(!selected&&active===key));
+  }
   async function refresh(){
    if(busy)return;
    busy=true;refreshButton.disabled=true;feedback.textContent='Chargement…';
@@ -82,12 +98,12 @@
   }
   const refreshButton=button('Actualiser',refresh);
   controls.append(refreshButton);
-  host.append(nav,controls,feedback,list);
+  host.append(nav,controls,feedback,list,partnerPanel);
   function renderControls(){
    for(const [key,tab] of Object.entries(tabButtons)){
     const count=['reports','requests'].includes(key)?pending(data[key]):data[key].length;
     tab.textContent=titles[key]+' '+count;
-    tab.setAttribute('aria-pressed',String(active===key));
+    tab.setAttribute('aria-pressed',String(!showingPartners&&active===key));
    }
    const prior=filter?.dataset.section===active?filter.value:null;
    const options={

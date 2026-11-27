@@ -17,3 +17,5 @@
 #pefCloudflareProfile .pef-moderation nav button[aria-pressed="false"]{background:#fff;border:1px solid #d8d8dc}
 #pefCloudflareProfile .pef-moderation nav button[aria-pressed="true"]{background:#a8cff1;border:1px solid #719ec5}
 #pefCloudflareProfile .pef-moderation input[type="search"]{background:#fff;color:#1c1c1e;width:100%}
+
+.pef-moderation > [hidden]{display:none}
