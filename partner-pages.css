@@ -30,3 +30,7 @@
 .pef-partner-preview-grid article {min-width:0}
 .pef-partner-preview-grid .pef-partner-photos {display:flex;overflow:auto;scroll-snap-type:x mandatory}
 .pef-partner-preview-grid .pef-partner-photos img {flex:0 0 100%;scroll-snap-align:start;background:#1b1b1b}
+#pefCloudflareProfile .pef-partners form :is(input,textarea,select)[aria-invalid="true"] {
+  border-color:#b42318!important;background:#fff0f0!important;color:#741b16!important
+}
+.pef-partners .pef-field-error {display:block;color:#a21818;font-size:.85rem}

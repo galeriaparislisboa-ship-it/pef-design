@@ -50,7 +50,29 @@
     catch(error){feedback.textContent=error.message}
     finally{control.disabled=false}
   }
+  function markInvalid(control,message) {
+    control.setAttribute('aria-invalid','true');
+    const id=control.id||'pef-field-'+crypto.randomUUID();
+    control.id=id;
+    let notice=document.getElementById(id+'-error');
+    if(!notice){
+      notice=element('small');
+      notice.id=id+'-error';
+      notice.className='pef-field-error';
+      control.after(notice);
+      control.setAttribute('aria-describedby',notice.id);
+    }
+    notice.textContent=message;
+  }
+  function clearInvalid(control) {
+    if(!control.hasAttribute('aria-invalid'))return;
+    document.getElementById(control.id+'-error')?.remove();
+    control.removeAttribute('aria-invalid');
+    control.removeAttribute('aria-describedby');
+  }
   function submit(form,label,feedback,work) {
+    form.addEventListener('invalid',event=>markInvalid(event.target,event.target.validationMessage),true);
+    form.addEventListener('input',event=>clearInvalid(event.target));
     const control=element('button',label);
     control.type='submit';form.append(control,feedback);
     form.onsubmit=event=>{event.preventDefault();void run(control,feedback,work)};
@@ -198,6 +220,13 @@
         field(form,'city','City',{value:listing.city,max:60});
         field(form,'country','Country',{value:listing.country,max:60});
         field(form,'whatsapp','WhatsApp',{value:listing.whatsapp,type:'tel',max:20});
+        const phone=form.elements.whatsapp;
+        const validatePhone=()=>phone.setCustomValidity(phone.value&&!/^\+?[1-9][0-9\s().-]{6,19}$/.test(phone.value.trim())
+          ?'Enter a valid WhatsApp number, including its country code.':'');
+        phone.addEventListener('input',validatePhone);
+        validatePhone();
+        phone.title='Enter a WhatsApp number with its country code.';
+        const savedValues=values(form);
         const edit=element('details');
         edit.append(element('summary','Edit listing'),form);
         submit(form,'Save details',feedback,async()=>{
@@ -209,6 +238,27 @@
           const publish=element('form'), feedback=status();
           if(admin)field(publish,'consent','Seller’s permission to publish',{type:'textarea',max:500});
           submit(publish,'Publish in feed',feedback,async()=>{
+            const current=values(form);
+            const invalid=[];
+            for(const key of ['title','description','category','city','country','whatsapp','price']){
+              const control=form.elements.namedItem(key);
+              clearInvalid(control);
+              if(!current[key]?.trim()||!control.validity.valid||(key==='category'&&current[key]==='All')){
+                markInvalid(control,control.validationMessage||'Required to publish.');
+                invalid.push(control);
+              }
+            }
+            if(invalid.length){
+              edit.open=true;
+              invalid[0].focus();
+              throw Error('Correct the fields marked in red before publishing.');
+            }
+            if(Object.keys(savedValues).some(key=>savedValues[key]!==current[key])){
+              edit.open=true;
+              form.querySelector('[type=submit]').focus();
+              throw Error('Click Save details before publishing your changes.');
+            }
+            if(listing.photos.length<2)throw Error('At least two photos are required to publish.');
             await request(path+'/publish/'+encodeURIComponent(listing.id),headers,'POST',values(publish));
             await refresh();
             await window.loadRemote?.();
