@@ -132,14 +132,14 @@
    for(const action of actions){
     const control=button(label[action],async()=>{
     if(busy)return;
-    if(action==='delete_account'&&!confirm('Supprimer définitivement le compte '+(row.email||row.display_name)+' ?'))return;
+    if(action==='delete_account'&&!confirm('Supprimer définitivement le compte '+(row.email||row.display_name)+' ? Ses annonces seront retirées du feed.'))return;
     if(['archive','revoke'].includes(action)&&!confirm(label[action]+' ce compte ?'))return;
     busy=true;refreshButton.disabled=true;feedback.textContent='Enregistrement…';
     try{
      await request(path,token,'PATCH',{id:row.id,action,note:note.value});
      data=await request(path,token);renderControls();renderList();
      feedback.textContent='Décision enregistrée.';
-     if(['archive','restore','hide','show','approve','revoke'].includes(action))await reloadFeed().catch(()=>{feedback.textContent='Décision enregistrée. Actualisez le flux public pour voir le changement.'});
+     if(['delete_account','archive','restore','hide','show','approve','revoke'].includes(action))await reloadFeed().catch(()=>{feedback.textContent='Décision enregistrée. Actualisez le flux public pour voir le changement.'});
     }catch(error){feedback.textContent=error.message}
     finally{busy=false;refreshButton.disabled=false}
     });

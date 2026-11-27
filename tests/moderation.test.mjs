@@ -187,9 +187,14 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
  const empty=await session('empty@example.test','seller');
  assert.equal((await call('/api/auth/me',empty)).status,200);
  assert.equal((await data()).accounts.find(row=>row.id==='empty').can_delete,1);
- assert.equal((await data()).accounts.find(row=>row.id==='seller').can_delete,0);
+ assert.equal((await data()).accounts.find(row=>row.id==='seller').can_delete,1);
  assert.equal((await action('admin','delete_account')).status,409);
- assert.equal((await action('seller','delete_account')).status,409);
+ assert.equal((await action('seller','delete_account')).status,200);
+ assert.equal((await action('seller','restore')).status,409);
+ assert.equal((await data()).accounts.some(row=>row.id==='seller'),false);
+ assert.equal((await feed()).listings.some(row=>row.seller_id==='seller'),false);
+ assert.ok(db.prepare('SELECT id FROM pef_objects WHERE seller_id=?').get('seller'));
+ assert.equal((await call('/api/auth/me',seller)).status,401);
  assert.equal((await action('empty','delete_account')).status,200);
  assert.equal((await call('/api/auth/me',empty)).status,401);
  assert.equal((await data()).accounts.some(row=>row.id==='empty'),false);

@@ -153,7 +153,7 @@ export async function partners(request,env,user,out) {
     }
     if (path==='/api/admin/partner-pages' && method==='GET') {
       return out({pages:await rows(db,`SELECT id,name,city,country,email,whatsapp,owner_id,preview_until,invite_until
-        FROM pef_partner_pages ORDER BY name,id`)});
+        FROM pef_partner_pages p WHERE NOT EXISTS(SELECT 1 FROM pef_deleted_accounts d WHERE d.user_id=p.id OR d.user_id=p.owner_id) ORDER BY name,id`)});
     }
     if (path==='/api/admin/partner-pages' && method==='POST') {
       const data = await request.json().catch(()=>null);
@@ -180,7 +180,7 @@ export async function partners(request,env,user,out) {
     const [id,action,listing,...rest] = path.slice(prefix.length+1).split('/');
     if (rest.length||!idPattern.test(id)) return out({error:'Not found'},404);
     const page = await query(db,`SELECT p.* FROM pef_partner_pages p LEFT JOIN users u ON u.id=p.owner_id
-      WHERE p.id=? AND (?=1 OR lower(u.email)=?)`,id,Number(admin),user.email.toLowerCase()).first();
+      WHERE p.id=? AND (?=1 OR lower(u.email)=?) AND NOT EXISTS(SELECT 1 FROM pef_deleted_accounts d WHERE d.user_id=p.id OR d.user_id=p.owner_id)`,id,Number(admin),user.email.toLowerCase()).first();
     if (!page) return out({error:'Seller page not found'},404);
     if (!action && method==='GET') return out({page:{id,name:page.name,city:page.city,country:page.country,whatsapp:page.whatsapp,owner_id:page.owner_id},listings:await pageListings(db,id)});
     if (method!=='POST') return out({error:'Method not allowed'},405);
