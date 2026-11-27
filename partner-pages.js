@@ -318,6 +318,52 @@
     if(!listings.length)host.append(element('p','No listings yet.'));
   }
 
+  function viewPage(page,listings,headers) {
+    const root=document.getElementById('pefPublicSellerContent');
+    const heading=element('div');
+    heading.className='pef-public-heading';
+    const identity=profileHeader(page);
+    identity.classList.add('pef-public-identity');
+    const title=identity.querySelector('h2');
+    title.replaceWith(element('h1',page.name));
+    heading.append(identity,element('p',listings.length+' objects · Private preview'));
+    const grid=element('div');grid.className='pef-public-grid';
+    for(const listing of listings){
+      const card=element('article');card.className='pef-public-object';
+      const cover=button('',()=>{
+        const dialog=element('dialog');
+        dialog.className='pef-partner-object-preview';
+        dialog.append(button('Close',()=>dialog.close()),element('h2',listing.title),element('p',listing.description));
+        showPhotos(dialog,listing.photos,headers);
+        dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+        document.body.append(dialog);dialog.showModal();
+      });
+      cover.className='pef-public-cover';
+      cover.setAttribute('aria-label','View '+listing.title);
+      showPhotos(cover,listing.photos.slice(0,1),headers);
+      const caption=element('div');
+      caption.className='pef-public-image-caption';
+      caption.append(element('span',listing.title),element('span',listing.price?listing.price+' €':''));
+      card.append(cover,caption);
+      grid.append(card);
+    }
+    delete root.dataset.sellerId;
+    root.dataset.partnerPreview='true';
+    root.replaceChildren(heading,grid);
+    if(!listings.length)root.append(element('p','No listings yet.'));
+    window.show('sellerPublic');
+    window.scrollTo(0,0);
+  }
+  function back() {
+    const screen=document.getElementById('sellerPublic');
+    const root=document.getElementById('pefPublicSellerContent');
+    if(!screen||screen.classList.contains('hidden')||root?.dataset.partnerPreview!=='true')return false;
+    delete root.dataset.partnerPreview;
+    root.replaceChildren();
+    window.show('profile');
+    return true;
+  }
+
   async function mount(host,token,admin) {
     const headers=bearer(token), root=element(admin?'section':'details'), body=element('div'), message=status();
     root.className='pef-partners';
@@ -347,7 +393,11 @@
       const path=prefix+'/'+id;
       const {page,listings}=await request(path,headers);
       body.replaceChildren(button('All seller pages',node=>run(node,message,list)),profileHeader(page),
-        element('p',page.public?'Public seller page':'Private seller page'));
+        element('p',page.public?'Public seller page':'Private seller page'),
+        button('View page',node=>run(node,message,async()=>{
+          const latest=await request(path,headers);
+          viewPage(latest.page,latest.listings,headers);
+        })));
       const logo=element('details');
       logo.append(element('summary','Partner logo'),logoEditor(path,headers,page,()=>open(id)));body.append(logo);
       if(admin&&!page.owner_id){
@@ -453,7 +503,7 @@
     }catch(error){feedback.textContent=error.message}
   }
 
-  window.pefPartners={mount,api,session};
+  window.pefPartners={mount,api,session,back};
   const onboardingHost=document.getElementById('pef-partner-onboarding');
   if(onboardingHost)void onboarding(onboardingHost);
 })();
