@@ -822,7 +822,7 @@ transform:none!important;
 .pef-like-button svg{fill:none}.pef-like-button[aria-pressed="true"] svg{fill:currentColor}
 .pef-like-button small{font-size:10px;line-height:1;color:inherit;font-variant-numeric:tabular-nums}
 .side .pef-like-button{gap:2px;padding:3px 6px}
-</style><link rel="stylesheet" href="/moderation-ui.css?v=4"><link rel="stylesheet" href="/partner-pages.css"><script src="/partner-pages.js?v=2"></script><script src="/moderation-ui.js?v=6"></script><style>.pef-newsletter{width:min(96vw,1060px);max-height:90dvh;box-sizing:border-box;border:1px solid #ccc;border-radius:20px;background:#f5f5f5;color:#222;padding:20px;font:14px/1.4 system-ui;overflow:auto}
+</style><link rel="stylesheet" href="/moderation-ui.css?v=5"><link rel="stylesheet" href="/partner-pages.css"><script src="/partner-pages.js?v=2"></script><script src="/moderation-ui.js?v=7"></script><style>.pef-newsletter{width:min(96vw,1060px);max-height:90dvh;box-sizing:border-box;border:1px solid #ccc;border-radius:20px;background:#f5f5f5;color:#222;padding:20px;font:14px/1.4 system-ui;overflow:auto}
 .pef-newsletter::backdrop{background:#000b}
 .pef-newsletter header,.pef-newsletter-preview,.pef-newsletter-actions,.pef-newsletter-piece{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pef-newsletter header{margin-bottom:12px}
@@ -2358,14 +2358,6 @@ async function openCloudflareProfile(token){
  panel.classList.toggle('cf-admin-profile',account.role==='admin');
  if(account.role==='seller')void window.pefPartners.mount(panel,token,false);
  if(account.role==='admin'){
-  const top=document.querySelector('.app > .top');
-  if(top){
-   const positionAdmin=()=>host.style.setProperty('--pef-admin-header-bottom',Math.ceil(top.getBoundingClientRect().bottom)+'px');
-   positionAdmin();
-   const resize=new ResizeObserver(positionAdmin);
-   resize.observe(top);
-   panel.refreshGesture.signal.addEventListener('abort',()=>resize.disconnect(),{once:true});
-  }
   window.pefModeration.mount(list,token,(row,onDetailsSaved)=>fridayGalleryListing(row,api,headers,null,onDetailsSaved),loadRemote,
    container=>window.pefPartners.mount(container,token,true));
   return;

@@ -64,7 +64,6 @@
    search.value='';
    if(data){renderControls();renderList()}
    else refresh();
-   nav.scrollIntoView({block:'nearest'});
   }
   const tabButtons=Object.fromEntries(Object.entries(titles).map(([key,title])=>{
    const tab=button(title,()=>selectSection(key));
@@ -77,7 +76,7 @@
    if(!partnerPanel.childElementCount)void mountPartners(partnerPanel);
   });
   partnerTab.setAttribute('aria-pressed','false');
-  if(mountPartners)nav.append(partnerTab);
+  if(mountPartners)nav.prepend(partnerTab);
   function selectPartners(selected){
    showingPartners=selected;
    partnerPanel.hidden=!selected;

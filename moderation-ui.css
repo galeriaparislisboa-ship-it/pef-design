@@ -20,6 +20,7 @@
 
 .pef-moderation > [hidden]{display:none}
 
-#profile:has(#pefCloudflareProfile.cf-admin-profile){padding-top:calc(var(--pef-admin-header-bottom, 90px) + 18px)!important}
-#pefCloudflareProfile .pef-moderation nav{scroll-margin-top:calc(var(--pef-admin-header-bottom, 90px) + 12px)}
+/* Keep the black header in the page flow while the administrator scrolls. */
+.app:has(> #profile:not(.hidden) #pefCloudflareProfile.cf-admin-profile) > .top{position:sticky!important;left:auto;transform:none}
+#profile:has(#pefCloudflareProfile.cf-admin-profile){padding-top:24px!important}
 #pefCloudflareProfile .pef-moderation .pef-delete-account{background:#f2a7ae;color:#401418;border-color:#d7818b}
