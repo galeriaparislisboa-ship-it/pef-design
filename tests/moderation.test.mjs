@@ -161,7 +161,7 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   assert.equal((await call(path+'/publish/'+publicId,admin,'POST',{})).status,400);
   assert.equal((await call(path+'/publish/'+publicId,admin,'POST',{consent:'Seller gave permission by email'})).status,200);
   const before=(await feed()).listings.find(row=>row.id===publicId);
-  assert.equal(before.source_url,'https://www.vinted.pt/items/10');
+  assert.equal(before.source_url,'https://www.vinted.pt/items/10-example');
   const etsyProfile={name:'Etsy Studio',city:'Lisbon',country:'Portugal',platform:'etsy',
    seller_url:'https://www.etsy.com/fr/shop/EtsyStudio?ref=test'};
   const etsyCreated=await call(partners,admin,'POST',etsyProfile);

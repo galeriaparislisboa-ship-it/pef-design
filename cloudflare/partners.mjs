@@ -24,7 +24,7 @@ function marketplaceUrl(value,profile=false) {
   }
   if(host==='vinted.pt'){
     const match=url.pathname.match(profile?/^\/member\/(\d+)(?:-[^/]+)?\/?$/:/^\/items\/(\d+)(?:-[^/]+)?\/?$/);
-    if(match)return {platform:'vinted',url:'https://www.vinted.pt/'+(profile?'member/':'items/')+match[1]};
+    if(match)return {platform:'vinted',url:'https://www.vinted.pt'+(profile?'/member/'+match[1]:url.pathname.replace(/\/$/,''))};
   }
   return null;
 }
