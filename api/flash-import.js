@@ -1,5 +1,8 @@
 const pages=new Set(['galeriaparislisboa.com','www.galeriaparislisboa.com']);
 const images=new Set([...pages,'images.squarespace-cdn.com','static1.squarespace.com']);
+const vintedPages=new Set(['www.vinted.pt','vinted.pt']);
+const vintedImages=new Set(Array.from({length:4},(_,index)=>'images'+(index+1)+'.vinted.net'));
+for(const host of vintedImages)images.add(host);
 function allowed(value,hosts,base){
  try{
   const url=new URL(value,base);
@@ -106,6 +109,19 @@ function extract(html,base){
  if(!title||!links.size)throw Error('No product title and photos were found.');
  return {title,price:extractPrice(product,meta,html),description:plain(product?.description||meta.get('og:description')?.[0]||meta.get('description')?.[0]),photos:[...links.values()].slice(0,5)};
 }
+function extractVinted(html,url){
+ const product=extract(html,url);
+ const gallery=new Map();
+ for(const [tag] of html.matchAll(/<img\b[^>]*>/gi)){
+  const index=Number(tag.match(/\bdata-testid=["']item-photo-(\d+)--img["']/i)?.[1]);
+  const source=tag.match(/\ssrc=["']([^"']+)["']/i)?.[1];
+  if(!index||!source||gallery.has(index))continue;
+  const photo=allowed(decode(source),vintedImages,url);
+  if(photo)gallery.set(index,photo.href);
+ }
+ if(gallery.size)product.photos=[...new Set([...gallery].sort(([a],[b])=>a-b).map(([,photo])=>photo))].slice(0,5);
+ return product;
+}
 function instagramPost(value){
  const url=allowed(value,new Set(['instagram.com','www.instagram.com']));
  return url?.pathname.match(/^\/(?:p|reel)\/([A-Za-z0-9_-]+)\/?$/)?.[1];
@@ -156,13 +172,17 @@ module.exports=async function handler(req,res){
    return res.status(422).json({error:message||'Instagram import unavailable.'});
   }
  }
- const hosts=image?images:pages;
- const url=typeof input==='string'&&input.length<=2500?allowed(input,hosts):null;
- if(!url)return res.status(400).json({error:'Enter a Galerie Paris–Lisboa product URL or an Instagram post URL.'});
+ const vinted=!image&&typeof input==='string'&&input.length<=2500?allowed(input,vintedPages):null;
+ if(vinted&&!/^\/items\/\d+(?:-[^/]+)?\/?$/.test(vinted.pathname))return res.status(400).json({error:'Enter a Vinted Portugal listing URL.'});
+ if(vinted)vinted.search='';
+ const hosts=image?images:vinted?vintedPages:pages;
+ const url=vinted||(typeof input==='string'&&input.length<=2500?allowed(input,hosts):null);
+ if(!url)return res.status(400).json({error:'Enter a Galerie Paris–Lisboa product URL, a Vinted Portugal listing URL or an Instagram post URL.'});
  try{
   if(image&&url.hostname==='images.squarespace-cdn.com')url.searchParams.set('format','1500w');
   const result=await retrieve(url,hosts,image?4*1024*1024:3*1024*1024,image?'image/jpeg,image/png,image/webp':'text/html,application/xhtml+xml');
   if(image){res.setHeader('Content-Type',result.type);return res.status(200).send(result.body)}
-  return res.status(200).json(extract(result.body.toString('utf8'),result.url));
+  const html=result.body.toString('utf8');
+  return res.status(200).json(vinted?extractVinted(html,result.url):extract(html,result.url));
  }catch(error){return res.status(422).json({error:error.message||'Import unavailable.'})}
 };
