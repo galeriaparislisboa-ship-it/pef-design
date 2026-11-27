@@ -331,10 +331,33 @@
     const form=element('form');
     field(form,'bio','Description',{type:'textarea',value:page.bio,max:600,required:false});
     field(form,'website','Website',{type:'url',value:page.website,max:500,required:false});
-    field(form,'instagram','Instagram username',{value:page.instagram,max:31,required:false});
+    const instagram=field(form,'instagram','Instagram username or profile URL',{value:page.instagram,max:500,required:false});
+    instagram.placeholder='@username or https://www.instagram.com/username/';
     field(form,'whatsapp','WhatsApp',{type:'tel',value:page.whatsapp,max:20,required:false});
     submit(form,'Save seller details',status(),async()=>{
-      await request(path+'/details',headers,'POST',values(form));
+      const details=values(form);
+      const input=details.instagram.trim();
+      let username=input.replace(/^@/,'');
+      if(input.includes('/')){
+        let profile;
+        try{
+          profile=new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(input)?input:'https://'+input);
+        }catch{}
+        const match=profile?.pathname.match(/^\/([a-z0-9_.]{1,30})\/?$/i);
+        if(!profile||!['http:','https:'].includes(profile.protocol)||!['instagram.com','www.instagram.com','m.instagram.com'].includes(profile.hostname)||profile.username||profile.password||profile.port||!match){
+          markInvalid(instagram,'Enter an Instagram profile URL or @username.');
+          instagram.focus();
+          throw Error('Check the Instagram field.');
+        }
+        username=match[1];
+      }
+      if(username&&!/^[a-z0-9_.]{1,30}$/i.test(username)){
+        markInvalid(instagram,'Enter an Instagram profile URL or @username.');
+        instagram.focus();
+        throw Error('Check the Instagram field.');
+      }
+      details.instagram=username;
+      await request(path+'/details',headers,'POST',details);
       await refresh();
     });
     return form;
