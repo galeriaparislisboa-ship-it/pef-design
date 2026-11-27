@@ -11,6 +11,25 @@ const sha = async value => Array.from(new Uint8Array(await crypto.subtle.digest(
 const newToken = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
 const clientOrigin = env => env.PEF_PARTNER_APP_ORIGIN || 'https://pef-design.vercel.app';
 
+function marketplaceUrl(value,profile=false) {
+  let url;
+  try { url=new URL(value); } catch { return null; }
+  if(url.protocol!=='https:'||url.username||url.password||url.port)return null;
+  const host=url.hostname.replace(/^www\./,'');
+  if(host==='etsy.com'){
+    const match=profile
+      ?url.pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?shop\/([a-z0-9]+)\/?$/i)
+      :url.pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?listing\/(\d+)(?:\/[^/]+)?\/?$/i);
+    if(match)return {platform:'etsy',url:'https://www.etsy.com/'+(profile?'shop/':'listing/')+match[1]};
+  }
+  if(host==='vinted.pt'){
+    const match=url.pathname.match(profile?/^\/member\/(\d+)(?:-[^/]+)?\/?$/:/^\/items\/(\d+)(?:-[^/]+)?\/?$/);
+    if(match)return {platform:'vinted',url:'https://www.vinted.pt/'+(profile?'member/':'items/')+match[1]};
+  }
+  return null;
+}
+export const marketplaceListingUrl = value => marketplaceUrl(value)?.url || null;
+
 export async function findPartnerInvitation(db, token, email) {
   if (!db || !tokenPattern.test(token || '')) return null;
   await initializeModeration(db);
@@ -118,12 +137,12 @@ async function saveDraft(request,env,page,out) {
 }
 
 async function publish(db,page,listing,consent,actor,out) {
-  const item = await query(db,`SELECT o.title,o.description,o.category,o.price,o.whatsapp,o.city,o.country,o.photos,o.is_hidden,l.published_at
+  const item = await query(db,`SELECT o.title,o.description,o.category,o.price,o.whatsapp,o.city,o.country,o.photos,o.is_hidden,l.published_at,l.source_url
     FROM pef_objects o JOIN pef_partner_listings l ON l.id=o.id WHERE o.id=? AND l.page_id=?`,listing,page.id).first();
   if (!item) return out({error:'Listing unavailable'},404);
   if (item.published_at) return out({error:'This listing has already been published. Use moderation to restore a hidden listing.'},409);
   if (![item.title,item.description,item.category,item.city,item.country].every(value=>value?.trim())||
-      item.category==='All'||!Number.isFinite(Number(item.price))||Number(item.price)<=0||!isPhone(item.whatsapp)||
+      item.category==='All'||!Number.isFinite(Number(item.price))||Number(item.price)<=0||(!marketplaceListingUrl(item.source_url)&&!isPhone(item.whatsapp))||
       JSON.parse(item.photos).length<2) return out({error:'Complete the description, category, price, location, WhatsApp and photos before publishing'},400);
   const result = await db.batch([
     query(db,`UPDATE pef_partner_listings SET consent=?,published_at=CURRENT_TIMESTAMP
@@ -179,14 +198,29 @@ export async function partners(request,env,user,out) {
       const data = await request.json().catch(()=>null);
       const fields = ['name','city','country','email','whatsapp'].map(key=>typeof data?.[key]==='string'?data[key].trim():'');
       const [name,city,country,rawEmail,whatsapp] = fields, email=rawEmail.toLowerCase();
+      const platform=data?.platform||'';
+      const profile=platform&&marketplaceUrl(data?.seller_url,true);
+      if(platform&&profile?.platform!==platform)return out({error:'Enter a seller profile URL for the selected marketplace'},400);
       if (!name||!city||!country||name.length>120||city.length>60||country.length>60||email.length>254||
-          !emailPattern.test(email)||email.endsWith('@provisional.invalid')||(whatsapp&&!isPhone(whatsapp)))
-        return out({error:'Enter the name, location, seller email and a valid WhatsApp number if confirmed'},400);
+          ((!platform||email)&&(!emailPattern.test(email)||email.endsWith('@provisional.invalid')))||(whatsapp&&!isPhone(whatsapp)))
+        return out({error:'Enter the name, location and valid contact details'},400);
       const id = crypto.randomUUID();
-      await db.batch([
+      const writes = [
         query(db,'INSERT INTO users(id,email,display_name) VALUES(?,?,?)',id,id+'@provisional.invalid',name),
         query(db,'INSERT INTO pef_partner_pages(id,name,city,country,email,whatsapp) VALUES (?,?,?,?,?,?)',id,name,city,country,email,whatsapp),
-      ]);
+      ];
+      if(profile){
+        const existing=`SELECT d.page_id FROM pef_partner_details d
+          WHERE lower(d.website)=lower(?) AND NOT EXISTS(SELECT 1 FROM pef_deleted_accounts WHERE user_id=d.page_id)`;
+        await db.batch([
+          query(db,`INSERT INTO users(id,email,display_name) SELECT ?,?,? WHERE NOT EXISTS(${existing})`,id,id+'@provisional.invalid',name,profile.url),
+          query(db,'INSERT INTO pef_partner_pages(id,name,city,country,email,whatsapp) SELECT ?,?,?,?,?,? WHERE changes()=1',id,name,city,country,email||id+'@provisional.invalid',whatsapp),
+          query(db,"INSERT INTO pef_partner_details(page_id,bio,website,instagram) SELECT ?,'',?,'' WHERE changes()=1",id,profile.url),
+        ]);
+        const seller=await query(db,existing+' ORDER BY page_id LIMIT 1',profile.url).first();
+        return seller?out({id:seller.page_id},seller.page_id===id?201:200):out({error:'Seller page unavailable'},409);
+      }
+      await db.batch(writes);
       return out({id},201);
     }
     if (path==='/api/partners/pages' && method==='GET') {
@@ -275,6 +309,7 @@ export async function partners(request,env,user,out) {
         const saved = await query(db,'UPDATE pef_partner_pages SET preview_hash=?,preview_until=? WHERE id=? AND owner_id IS NULL',digest,expires,id).run();
         return saved.meta.changes?out({url:url.href,expires}):out({error:'Page has been claimed'},409);
       }
+      if (page.email.endsWith('@provisional.invalid')) return out({error:'A seller email is required before sending an invitation'},400);
       if (!env.RESEND_API_KEY) return out({error:'Invitation email delivery is unavailable'},503);
       const saved = await query(db,`UPDATE pef_partner_pages SET invite_hash=?,invite_until=?
         WHERE id=? AND owner_id IS NULL AND (invite_until IS NULL OR invite_until<?)`,digest,expires,id,expires-60000).run();

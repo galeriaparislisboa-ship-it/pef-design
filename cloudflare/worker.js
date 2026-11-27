@@ -1,4 +1,4 @@
-import {partners,findPartnerInvitation,claimPartnerPage,partnerMediaAccess} from './partners.mjs';
+import {partners,findPartnerInvitation,claimPartnerPage,partnerMediaAccess,marketplaceListingUrl} from './partners.mjs';
 import {newsletters} from "./newsletters.mjs";
 import {initializeModeration, moderation, visibleListing, listingLikeCount} from "./moderation.mjs";
 import {googleAuth} from "./auth-google.js";
@@ -187,9 +187,10 @@ export default {
        FROM pef_partner_listings l JOIN pef_partner_pages p ON p.id=l.page_id
        LEFT JOIN pef_partner_presentation s ON s.page_id=p.id WHERE l.id=pef_objects.id) AS seller_profile_hidden,
      (SELECT l.page_id FROM pef_partner_listings l JOIN pef_partner_presentation p ON p.page_id=l.page_id
-       WHERE l.id=pef_objects.id AND p.logo IS NOT NULL) AS seller_logo_page
+       WHERE l.id=pef_objects.id AND p.logo IS NOT NULL) AS seller_logo_page,
+     (SELECT l.source_url FROM pef_partner_listings l WHERE l.id=pef_objects.id) AS source_url
      FROM pef_objects WHERE ${visibleListing} ORDER BY created_at DESC LIMIT 100`).all();
-    const listings=result.results.map(listingWithMedia);
+    const listings=result.results.map(row=>listingWithMedia({...row,source_url:marketplaceListingUrl(row.source_url)}));
     return out({listings,count:listings.length});
    }
    catch{return out({error:'Unable to load listings'},500);}

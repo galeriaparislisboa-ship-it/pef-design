@@ -127,11 +127,11 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   assert.equal(created.status,201);
   const {id:pageId}=await created.json();
   const path=partners+'/'+pageId;
-  async function draft(title){
+  async function draft(title,pagePath=path,source='https://www.vinted.pt/items/10-example'){
    const form=new FormData();
-   for(const [key,value] of Object.entries({title,description:'A design object',price:'110',category:'Design',source_url:'https://www.vinted.pt/items/10-example'}))form.set(key,value);
+   for(const [key,value] of Object.entries({title,description:'A design object',price:'110',category:'Design',source_url:source}))form.set(key,value);
    for(let i=0;i<2;i++)form.append('photo',new Blob([Uint8Array.of(255,216,255,i)],{type:'image/jpeg'}),'test.jpg');
-   const response=await worker.fetch(new Request('https://test.example'+path+'/drafts',{method:'POST',headers:{Authorization:'Bearer '+admin},body:form}),env);
+   const response=await worker.fetch(new Request('https://test.example'+pagePath+'/drafts',{method:'POST',headers:{Authorization:'Bearer '+admin},body:form}),env);
    assert.equal(response.status,201,await response.clone().text());
    return (await response.json()).id;
   }
@@ -161,6 +161,22 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   assert.equal((await call(path+'/publish/'+publicId,admin,'POST',{})).status,400);
   assert.equal((await call(path+'/publish/'+publicId,admin,'POST',{consent:'Seller gave permission by email'})).status,200);
   const before=(await feed()).listings.find(row=>row.id===publicId);
+  assert.equal(before.source_url,'https://www.vinted.pt/items/10');
+  const etsyProfile={name:'Etsy Studio',city:'Lisbon',country:'Portugal',platform:'etsy',
+   seller_url:'https://www.etsy.com/fr/shop/EtsyStudio?ref=test'};
+  const etsyCreated=await call(partners,admin,'POST',etsyProfile);
+  assert.equal(etsyCreated.status,201,await etsyCreated.clone().text());
+  const {id:etsyId}=await etsyCreated.json();
+  const duplicate=await call(partners,admin,'POST',{...etsyProfile,seller_url:'https://etsy.com/shop/etsystudio/'});
+  assert.equal(duplicate.status,200);
+  assert.equal((await duplicate.json()).id,etsyId);
+  const etsyPath=partners+'/'+etsyId;
+  const lampId=await draft('Orange lamp',etsyPath,'https://www.etsy.com/fr/listing/4608930616/lampe-orange?ref=test');
+  assert.equal((await call(etsyPath+'/publish/'+lampId,admin,'POST',{consent:'Seller confirmed permission'})).status,200);
+  const lamp=(await feed()).listings.find(row=>row.id===lampId);
+  assert.equal(lamp.source_url,'https://www.etsy.com/listing/4608930616');
+  assert.equal(lamp.whatsapp,'');
+  assert.equal(lamp.seller_profile_hidden,1);
   assert.equal(before.seller_name,profile.name);
   assert.equal(before.seller_id,pageId);
   assert.equal(before.seller_profile_hidden,1);

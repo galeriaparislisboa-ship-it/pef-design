@@ -2,7 +2,9 @@ const pages=new Set(['galeriaparislisboa.com','www.galeriaparislisboa.com']);
 const images=new Set([...pages,'images.squarespace-cdn.com','static1.squarespace.com']);
 const vintedPages=new Set(['www.vinted.pt','vinted.pt']);
 const vintedImages=new Set(Array.from({length:4},(_,index)=>'images'+(index+1)+'.vinted.net'));
-for(const host of vintedImages)images.add(host);
+const etsyPages=new Set(['www.etsy.com','etsy.com']);
+const etsyImages=new Set(['i.etsystatic.com']);
+for(const host of [...vintedImages,...etsyImages])images.add(host);
 function allowed(value,hosts,base){
  try{
   const url=new URL(value,base);
@@ -122,6 +124,25 @@ function extractVinted(html,url){
  if(gallery.size)product.photos=[...new Set([...gallery].sort(([a],[b])=>a-b).map(([,photo])=>photo))].slice(0,5);
  return product;
 }
+async function importEtsy(id){
+ const key=(process.env.ETSY_API_KEY||'').trim();
+ if(!key)throw Error('Etsy automatic import is not configured. Enter listing details and add photos manually.');
+ const response=await fetch('https://openapi.etsy.com/v3/application/listings/'+id+'?includes=Shop,Images',{
+  headers:{'x-api-key':key,Accept:'application/json'},
+  redirect:'error',
+  signal:AbortSignal.timeout(8000)
+ });
+ if(!response.ok)throw Error('Etsy could not provide this listing. Check the link or enter the details manually.');
+ const listing=await response.json();
+ if(!listing.title||listing.state!=='active')throw Error('This Etsy listing is unavailable.');
+ const photos=(listing.images||[]).toSorted((a,b)=>a.rank-b.rank)
+  .map(image=>allowed(image.url_570xN||image.url_fullxfull,etsyImages)?.href).filter(Boolean);
+ const shop=listing.shop?.shop_name;
+ const {amount,divisor,currency_code:currency}=listing.price||{};
+ return {title:plain(listing.title),description:plain(listing.description),
+  price:currency==='EUR'&&divisor>0?euroPrice(amount/divisor):null,photos:[...new Set(photos)].slice(0,5),
+  seller:shop?{name:shop,url:'https://www.etsy.com/shop/'+encodeURIComponent(shop)}:null};
+}
 function instagramPost(value){
  const url=allowed(value,new Set(['instagram.com','www.instagram.com']));
  return url?.pathname.match(/^\/(?:p|reel)\/([A-Za-z0-9_-]+)\/?$/)?.[1];
@@ -172,12 +193,19 @@ module.exports=async function handler(req,res){
    return res.status(422).json({error:message||'Instagram import unavailable.'});
   }
  }
+ const etsy=!image&&typeof input==='string'&&input.length<=2500?allowed(input,etsyPages):null;
+ if(etsy){
+  const id=etsy.pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?listing\/(\d+)(?:\/[^/]+)?\/?$/i)?.[1];
+  if(!id)return res.status(400).json({error:'Enter an Etsy listing URL.'});
+  try{return res.status(200).json(await importEtsy(id))}
+  catch(error){return res.status(422).json({error:error.message||'Etsy import unavailable.'})}
+ }
  const vinted=!image&&typeof input==='string'&&input.length<=2500?allowed(input,vintedPages):null;
  if(vinted&&!/^\/items\/\d+(?:-[^/]+)?\/?$/.test(vinted.pathname))return res.status(400).json({error:'Enter a Vinted Portugal listing URL.'});
  if(vinted)vinted.search='';
  const hosts=image?images:vinted?vintedPages:pages;
  const url=vinted||(typeof input==='string'&&input.length<=2500?allowed(input,hosts):null);
- if(!url)return res.status(400).json({error:'Enter a Galerie Paris–Lisboa product URL, a Vinted Portugal listing URL or an Instagram post URL.'});
+ if(!url)return res.status(400).json({error:'Enter a Galerie Paris–Lisboa product URL, a Vinted Portugal or Etsy listing URL, or an Instagram post URL.'});
  try{
   if(image&&url.hostname==='images.squarespace-cdn.com')url.searchParams.set('format','1500w');
   const result=await retrieve(url,hosts,image?4*1024*1024:3*1024*1024,image?'image/jpeg,image/png,image/webp':'text/html,application/xhtml+xml');

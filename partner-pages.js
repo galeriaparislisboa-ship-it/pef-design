@@ -12,6 +12,24 @@
   const section = '/api/admin/partner-pages';
   const ownerSection = '/api/partners/pages';
 
+  function marketplaceListing(value) {
+    try {
+      const url=new URL(value), host=url.hostname.replace(/^www\./,'');
+      if(url.protocol!=='https:'||url.username||url.password||url.port)return null;
+      if(host==='etsy.com'&&/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?listing\/\d+(?:\/[^/]+)?\/?$/i.test(url.pathname))
+        return {platform:'etsy',label:'View on Etsy',url:url.href};
+      if(host==='vinted.pt'&&/^\/items\/\d+(?:-[^/]+)?\/?$/.test(url.pathname))
+        return {platform:'vinted',label:'View on Vinted',url:url.href};
+    }catch{}
+    return null;
+  }
+  async function flashImport(url,instagramAccount='') {
+    const response=await fetch('/api/flash-import?'+new URLSearchParams({url,instagramAccount}));
+    const product=await response.json();
+    if(!response.ok)throw Error(product.error||'Could not read this listing.');
+    return product;
+  }
+
   function element(tag,text) {
     const node=document.createElement(tag);
     if(text)node.textContent=text;
@@ -119,9 +137,9 @@
     label.append(select);form.append(label);
     return select;
   }
-  function draftForm(path,headers,refresh) {
+  function draftForm(path,headers,refresh,initial={}) {
     const form=element('form'), feedback=status(), importFeedback=status();
-    const source=field(form,'source_url','Listing URL',{type:'url',max:1500,required:false});
+    const source=field(form,'source_url','Listing URL',{value:initial.url,type:'url',max:1500,required:false});
     const account=field(form,'instagram_account','Instagram account',{max:31,required:false});
     account.parentElement.hidden=true;
     source.oninput=()=>{
@@ -152,11 +170,10 @@
         return row;
       }));
     };
-    form.append(button('Flash import',control=>run(control,importFeedback,async()=>{
+    const flash=button('Flash import',control=>run(control,importFeedback,async()=>{
       if(!source.value||!source.checkValidity())throw Error('Enter a valid listing URL.');
-      const data=await fetch('/api/flash-import?'+new URLSearchParams({url:source.value,instagramAccount:account.value}));
-      const product=await data.json();
-      if(!data.ok)throw Error(product.error||'Could not read this listing.');
+      const product=initial.product&&initial.url===source.value
+        ?initial.product:await flashImport(source.value,account.value);
       const imported=await Promise.allSettled(product.photos.slice(0,5).map(async (url,index)=>{
         const response=await fetch('/api/flash-import?'+new URLSearchParams({url,image:'1'}));
         if(!response.ok)throw Error('Photo unavailable');
@@ -169,7 +186,8 @@
       form.elements.price.value=product.price??'';
       draw();
       return photos.length+' photos imported. Review the details and add photos if needed.';
-    })),importFeedback);
+    }));
+    form.append(flash,importFeedback);
     field(form,'title','Title',{max:60});
     field(form,'description','Description',{type:'textarea',max:80,required:false});
     field(form,'price','Price (€)',{type:'number',required:false});
@@ -193,6 +211,7 @@
       await request(path+'/drafts',headers,'POST',data);
       await refresh();
     });
+    if(initial.product)flash.click();
     return form;
   }
   function showPhotos(container,photos,headers) {
@@ -225,7 +244,8 @@
         categoryField(form,listing.category||'');
         field(form,'city','City',{value:listing.city,max:60});
         field(form,'country','Country',{value:listing.country,max:60});
-        field(form,'whatsapp','WhatsApp',{value:listing.whatsapp,type:'tel',max:20});
+        const marketplace=marketplaceListing(listing.source_url);
+        field(form,'whatsapp','WhatsApp',{value:listing.whatsapp,type:'tel',max:20,required:!marketplace});
         const phone=form.elements.whatsapp;
         const validatePhone=()=>phone.setCustomValidity(phone.value&&!/^\+?[1-9][0-9\s().-]{6,19}$/.test(phone.value.trim())
           ?'Enter a valid WhatsApp number, including its country code.':'');
@@ -236,7 +256,9 @@
         const edit=element('details');
         edit.append(element('summary','Edit listing'),form);
         submit(form,'Save details',feedback,async()=>{
-          await request('/api/listings/'+encodeURIComponent(listing.id),headers,'PATCH',values(form));
+          const details=values(form);
+          if(marketplace&&!details.whatsapp.trim()&&!listing.whatsapp)delete details.whatsapp;
+          await request('/api/listings/'+encodeURIComponent(listing.id),headers,'PATCH',details);
           await refresh();
         });
         card.append(edit);
@@ -249,6 +271,7 @@
             for(const key of ['title','description','category','city','country','whatsapp','price']){
               const control=form.elements.namedItem(key);
               clearInvalid(control);
+              if(key==='whatsapp'&&marketplace&&!current[key]?.trim())continue;
               if(!current[key]?.trim()||!control.validity.valid||(key==='category'&&current[key]==='All')){
                 markInvalid(control,control.validationMessage||'Required to publish.');
                 invalid.push(control);
@@ -429,13 +452,51 @@
       body.replaceChildren();
       const {pages}=await request(prefix,headers);
       if(admin){
-        const create=element('details'), form=element('form');
+        const create=element('details'), form=element('form'), sourceFields=element('div');
+        const sourceLabel=element('label','Marketplace'), platform=element('select');
+        platform.name='platform';
+        platform.add(new Option('Manual entry',''));
+        platform.add(new Option('Etsy','etsy'));
+        platform.add(new Option('Vinted','vinted'));
+        sourceLabel.append(platform);
+        form.append(sourceLabel,sourceFields);
+        const source=field(sourceFields,'listing_url','Listing URL',{type:'url',max:1500,required:false});
+        const seller=field(sourceFields,'seller_url','Seller profile URL',{type:'url',max:500,required:false});
+        const importStatus=status();
+        let imported;
+        sourceFields.append(button('Flash Connect',control=>run(control,importStatus,async()=>{
+          if(marketplaceListing(source.value)?.platform!==platform.value)throw Error('Enter a listing URL for the selected marketplace.');
+          const url=source.value;
+          const product=await flashImport(url);
+          if(url!==source.value||marketplaceListing(url)?.platform!==platform.value)return;
+          imported={url,product};
+          if(product.seller?.url&&!seller.value)seller.value=product.seller.url;
+          if(product.seller?.name&&!form.elements.name.value)form.elements.name.value=product.seller.name;
+          return 'Listing found. Confirm the seller details below.';
+        })),importStatus);
         profileFields(form,{},true);
+        const updateSource=()=>{
+          sourceFields.hidden=!platform.value;
+          source.required=seller.required=Boolean(platform.value);
+          form.elements.email.required=!platform.value;
+          source.disabled=seller.disabled=!platform.value;
+          source.placeholder=platform.value==='etsy'?'https://www.etsy.com/listing/…':'https://www.vinted.pt/items/…';
+          seller.placeholder=platform.value==='etsy'?'https://www.etsy.com/shop/…':'https://www.vinted.pt/member/…';
+        };
+        platform.onchange=()=>{
+          source.value=seller.value=importStatus.textContent='';
+          imported=undefined;
+          updateSource();
+        };
+        updateSource();
         submit(form,'Create provisional page',status(),async()=>{
+          if(platform.value&&marketplaceListing(source.value)?.platform!==platform.value)throw Error('Enter a listing URL for the selected marketplace.');
+          const initial=platform.value
+            ?{url:source.value,product:imported?.url===source.value?imported.product:null}:undefined;
           const {id}=await request(prefix,headers,'POST',values(form));
-          await open(id);
+          await open(id,initial);
         });
-        create.append(element('summary','New provisional page'),form);body.append(create);
+        create.append(element('summary','Create a page'),form);body.append(create);
       }
       for(const page of pages){
         const control=button(page.name+(admin?(page.owner_id?' · Claimed':' · Provisional'):''),
@@ -444,7 +505,7 @@
       }
       if(!pages.length&&!admin)root.remove();
     }
-    async function open(id){
+    async function open(id,initial){
       const path=prefix+'/'+id;
       const {page,listings}=await request(path,headers);
       body.replaceChildren(button('All seller pages',node=>run(node,message,list)),profileHeader(page),
@@ -463,17 +524,20 @@
       if(admin&&!page.owner_id){
         const feedback=status(), link=element('input');
         link.readOnly=true;link.hidden=true;link.setAttribute('aria-label','Private preview link');
+        const invite=button('Send takeover invitation',node=>run(node,feedback,async()=>{
+          if(!confirm('Send the seller an invitation to take over '+page.name+'?'))return;
+          await request(path+'/invite',headers,'POST');
+          return 'Invitation emailed. This link is valid for 3 days.';
+        }));
         body.append(button('Generate private preview link',node=>run(node,feedback,async()=>{
           const result=await request(path+'/preview',headers,'POST');
           link.value=result.url;link.hidden=false;link.select();
           return 'Private preview link valid for 7 days. Copy it to share.';
-        })),link,button('Send takeover invitation',node=>run(node,feedback,async()=>{
-          if(!confirm('Send the seller an invitation to take over '+page.name+'?'))return;
-          await request(path+'/invite',headers,'POST');
-          return 'Invitation emailed. This link is valid for 3 days.';
-        })),feedback);
+        })),link,feedback);
+        if(!page.email?.endsWith('@provisional.invalid'))body.append(invite);
         const draft=element('details');
-        draft.append(element('summary','New listing draft'),draftForm(path,headers,()=>open(id)));body.append(draft);
+        draft.open=Boolean(initial);
+        draft.append(element('summary','New listing draft'),draftForm(path,headers,()=>open(id),initial));body.append(draft);
       }
       if(!admin){
         const visibility=status();
@@ -560,7 +624,7 @@
     }catch(error){feedback.textContent=error.message}
   }
 
-  window.pefPartners={mount,api,session,back,profileExtras};
+  window.pefPartners={mount,api,session,back,profileExtras,marketplaceListing};
   const onboardingHost=document.getElementById('pef-partner-onboarding');
   if(onboardingHost)void onboarding(onboardingHost);
 })();
