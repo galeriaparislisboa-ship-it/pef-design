@@ -1,4 +1,15 @@
 const tables = [
+  `CREATE TABLE IF NOT EXISTS pef_partner_pages (
+    id TEXT PRIMARY KEY REFERENCES users(id), name TEXT NOT NULL, city TEXT NOT NULL,
+    country TEXT NOT NULL, whatsapp TEXT NOT NULL DEFAULT '', email TEXT NOT NULL,
+    preview_hash TEXT UNIQUE, preview_until INTEGER, invite_hash TEXT UNIQUE, invite_until INTEGER,
+    owner_id TEXT REFERENCES users(id), claim_event TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS pef_partner_listings (
+    id TEXT PRIMARY KEY REFERENCES pef_objects(id), page_id TEXT NOT NULL REFERENCES pef_partner_pages(id),
+    source_url TEXT NOT NULL DEFAULT '', consent TEXT, published_at TEXT
+  )`,
+
   "CREATE TABLE IF NOT EXISTS pef_archived_accounts (user_id TEXT PRIMARY KEY, archived_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
   "CREATE TABLE IF NOT EXISTS pef_listing_likes (listing_id TEXT NOT NULL REFERENCES pef_objects(id) ON DELETE CASCADE, user_id TEXT NOT NULL, PRIMARY KEY (listing_id,user_id))",
   "CREATE TABLE IF NOT EXISTS pef_reports (id TEXT PRIMARY KEY, object_id TEXT NOT NULL, reporter_id TEXT NOT NULL, reason TEXT NOT NULL, details TEXT, created_at TEXT)",
@@ -8,16 +19,17 @@ const tables = [
   "CREATE TABLE IF NOT EXISTS pef_verification_requests (id TEXT PRIMARY KEY, seller_id TEXT UNIQUE NOT NULL, requested_badge TEXT, display_name TEXT, business_name TEXT, website TEXT, registration_number TEXT, country TEXT, details TEXT, status TEXT, admin_note TEXT, reviewed_at TEXT, created_at TEXT)",
   "CREATE TABLE IF NOT EXISTS pef_moderation_log (id TEXT PRIMARY KEY, actor TEXT NOT NULL, target TEXT NOT NULL, action TEXT NOT NULL, note TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
 ];
-export const visibleListing = "COALESCE(is_hidden,0)=0 AND NOT EXISTS (SELECT 1 FROM pef_archived_accounts WHERE user_id=pef_objects.seller_id)";
+export const visibleListing = "COALESCE(is_hidden,0)=0 AND NOT EXISTS (SELECT 1 FROM pef_archived_accounts WHERE user_id=pef_objects.seller_id) AND NOT EXISTS (SELECT 1 FROM pef_partner_listings WHERE id=pef_objects.id AND published_at IS NULL)";
 export const listingLikeCount = 'COALESCE(pef_objects.likes,0)+(SELECT COUNT(*) FROM pef_listing_likes WHERE listing_id=pef_objects.id) AS likes';
-let initialized;
+const initialized = new WeakMap();
 export function initializeModeration(db) {
-  return initialized ??= db.batch(tables.map(sql => db.prepare(sql))).then(()=>
-    db.prepare('CREATE INDEX IF NOT EXISTS pef_listing_likes_user ON pef_listing_likes(user_id)').run()
-  ).catch(error => {
-    initialized = undefined;
-    throw error;
-  });
+  if (!initialized.has(db)) {
+    initialized.set(db,db.batch(tables.map(sql=>db.prepare(sql))).then(()=>db.batch([
+      db.prepare('CREATE INDEX IF NOT EXISTS pef_listing_likes_user ON pef_listing_likes(user_id)'),
+      db.prepare('CREATE INDEX IF NOT EXISTS pef_partner_listings_page ON pef_partner_listings(page_id)'),
+    ])).catch(error=>{initialized.delete(db);throw error}));
+  }
+  return initialized.get(db);
 }
 
 const reasons = new Set(['Inappropriate content', 'Misleading listing', 'Spam', 'Other']);
@@ -95,7 +107,8 @@ export async function moderation(request, db, user, out) {
     if (!id || !action || note===null) return out({error:'Invalid decision'},400);
     let change, followup;
     if (action==='hide' || action==='show') {
-      change=query('UPDATE pef_objects SET is_hidden=? WHERE id=? AND COALESCE(is_hidden,0)<>?',Number(action==='hide'),id,Number(action==='hide'));
+      change=query(`UPDATE pef_objects SET is_hidden=? WHERE id=? AND COALESCE(is_hidden,0)<>?
+        AND (?='hide' OR NOT EXISTS(SELECT 1 FROM pef_partner_listings WHERE id=pef_objects.id AND published_at IS NULL))`,Number(action==='hide'),id,Number(action==='hide'),action);
     } else if (action==='archive' || action==='restore') {
       const target=await query('SELECT email FROM users WHERE id=?',id).first();
       if (!target) return out({error:'Account not found'},404);

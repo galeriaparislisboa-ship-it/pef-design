@@ -1,3 +1,4 @@
+import {partners,findPartnerInvitation,claimPartnerPage,partnerMediaAccess} from './partners.mjs';
 import {newsletters} from "./newsletters.mjs";
 import {initializeModeration, moderation, visibleListing, listingLikeCount} from "./moderation.mjs";
 import {googleAuth} from "./auth-google.js";
@@ -46,25 +47,38 @@ export default {
   if(['/api/admin/moderation','/api/reports','/api/verification'].includes(path)){
    return moderation(request,env.DB,await verifySession(request,env),out);
   }
+  if(path.startsWith('/api/admin/partner-pages')||path.startsWith('/api/partners/')){
+   return partners(request,env,path==='/api/partners/preview'?null:await authorize(request,env),out);
+  }
   if(path==='/health'&&method==='GET')return out({service:'pef-design-api',status:'ok'});
-  if(path==='/auth/google/start'||path==='/auth/google/callback')return googleAuth(request,env,async email=>{const payload=base64url(enc.encode(JSON.stringify({role:'gallery',email,exp:Date.now()+1800000})));return payload+'.'+await sign(env.SESSION_SECRET,payload)});
+  async function createSession(email,role,userId){
+   const payload=base64url(enc.encode(JSON.stringify({role,email,userId,exp:Date.now()+1800000})));
+   return payload+'.'+await sign(env.SESSION_SECRET,payload);
+  }
+  if(path==='/auth/google/start'||path==='/auth/google/callback'){
+   return googleAuth(request,env,createSession,claimPartnerPage);
+  }
   if(method==='POST'&&(path==='/api/auth/code/send'||path==='/api/auth/code/verify')){
    if(!env.DB||!env.SESSION_SECRET||!env.RESEND_API_KEY)return out({error:'Sign-in unavailable'},503);
    const body=await request.json().catch(()=>null);
    const email=typeof body?.email==='string'?body.email.trim().toLowerCase():'';
    const role=email==='ndondina@muchimuchi.fr'?'admin':email==='galeriaparislisboa@gmail.com'?'gallery':'seller';
    try{
-    const account=email.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&await env.DB.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').bind(email).first();
+    const invite=typeof body?.invite==='string'?body.invite:'';
+    const invitation=invite&&role==='seller'?await findPartnerInvitation(env.DB,invite,email):null;
+    if(invite&&!invitation)return out({error:'This invitation is unavailable or does not match the invited email'},400);
+    let account=email.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&await env.DB.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').bind(email).first();
     if(path.endsWith('/send')){
-     if(account)await issueCode(env.DB,'pef-otp:'+env.SESSION_SECRET,email,async(to,code)=>{
+     if(account||invitation)await issueCode(env.DB,'pef-otp:'+env.SESSION_SECRET+invite,email,async(to,code)=>{
       const res=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({from:'PEF Design <login@auth.galeriaparislisboa.com>',to:[to],subject:'Your PEF Design sign-in code',text:'Your sign-in code is '+code+'. It expires in 10 minutes.',html:"<html lang=\"en\"><body style=\"margin:0;background:#111\"><table role=\"presentation\" width=\"100%\" bgcolor=\"#111111\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px\"><table role=\"presentation\" width=\"100%\" bgcolor=\"#1a1a1a\" style=\"max-width:460px;border:1px solid #333;border-radius:18px\"><tr><td style=\"padding:28px;color:#fff;font-family:Arial,sans-serif\"><p style=\"margin:0;color:#a8cff1;font-weight:bold\">PEF Design</p><h1 style=\"font-size:26px\">Your sign-in code</h1><p style=\"color:#ccc\">Enter this code in PEF Design to continue.</p><p style=\"text-align:center;background:#a8cff1;color:#111;font-size:32px;font-weight:bold;letter-spacing:4px;border-radius:12px;padding:14px\">CODE_SLOT</p><p style=\"color:#ccc;font-size:14px;line-height:1.5\">This code expires in 10 minutes. If you didn’t request it, you can ignore this email.</p></td></tr></table></td></tr></table></body></html>".replace('CODE_SLOT',code)})});
       if(!res.ok)throw Error('Email delivery failed');
      });
      return out({ok:true});
     }
-    if(!account||!await consumeCode(env.DB,'pef-otp:'+env.SESSION_SECRET,email,body?.code))return out({error:'Invalid or expired code'},401);
-    const payload=base64url(enc.encode(JSON.stringify({role,email,userId:account.id,exp:Date.now()+1800000})));
-    return out({token:payload+'.'+await sign(env.SESSION_SECRET,payload),role,email,expires_in:1800});
+    if((!account&&!invitation)||!await consumeCode(env.DB,'pef-otp:'+env.SESSION_SECRET+invite,email,body?.code))return out({error:'Invalid or expired code'},401);
+    if(invitation)account=await claimPartnerPage(env.DB,invite,email);
+    if(!account)return out({error:'The page was already claimed or the invitation expired'},409);
+    return out({token:await createSession(email,role,account.id),role,email,expires_in:1800});
    }catch{return out({error:'Sign-in temporarily unavailable'},503)}
   }
   if(path==='/api/auth/login'&&method==='POST'){
@@ -165,7 +179,8 @@ export default {
     await initializeModeration(env.DB);
     const result=await env.DB.prepare(`SELECT id,seller_id,title,description,category,price,city,country,whatsapp,listing_status,negotiable,trade,promotion_price,object_date,views,${listingLikeCount},whatsapp_clicks,created_at,photos,video_url,media_order,trim_start,trim_end,
      (SELECT badge FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id) AS seller_badge,
-     (SELECT display_name FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id AND badge<>'none') AS seller_name
+     COALESCE((SELECT p.name FROM pef_partner_listings l JOIN pef_partner_pages p ON p.id=l.page_id WHERE l.id=pef_objects.id),
+       (SELECT display_name FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id AND badge<>'none')) AS seller_name
      FROM pef_objects WHERE ${visibleListing} ORDER BY created_at DESC LIMIT 100`).all();
     const listings=result.results.map(listingWithMedia);
     return out({listings,count:listings.length});
@@ -269,6 +284,9 @@ value=String(value).trim();
    if(!env.MEDIA)return out({error:'Media storage unavailable'},503);
    const key=path.slice('/media/'.length);
    if(!/^listings\/[a-zA-Z0-9_-]+\/[a-f0-9-]{36}\.(jpg|png|webp|mp4|webm|mov)$/.test(key))return out({error:'Not found'},404);
+   const managedId=key.split('/')[1];
+   const managed=managedId.startsWith('partner_');
+   if(managed&&(!env.DB||!await partnerMediaAccess(request,env,await authorize(request,env),managedId)))return out({error:'Not found'},404);
    const range=request.headers.get('Range');
    const metadata=range||method==='HEAD'?await env.MEDIA.head(key):null;
    if((range||method==='HEAD')&&!metadata)return out({error:'Not found'},404);
@@ -285,7 +303,7 @@ value=String(value).trim();
    }
    const object=method==='HEAD'?metadata:await env.MEDIA.get(key,status===206?{range:{offset,length}}:undefined);
    if(!object)return out({error:'Not found'},404);
-   const mediaHeaders={...headers,'Content-Type':object.httpMetadata?.contentType||'application/octet-stream','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff','Accept-Ranges':'bytes','Content-Length':String(status===206?length:object.size)};
+   const mediaHeaders={...headers,'Content-Type':object.httpMetadata?.contentType||'application/octet-stream','Cache-Control':managed?'private, no-store':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff','Accept-Ranges':'bytes','Content-Length':String(status===206?length:object.size)};
    if(status===206)mediaHeaders['Content-Range']='bytes '+offset+'-'+(offset+length-1)+'/'+metadata.size;
    return new Response(method==='HEAD'?null:object.body,{status,headers:mediaHeaders});
   }

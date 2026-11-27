@@ -100,4 +100,87 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
  assert.equal((await action(application.id,'revoke')).status,200);
  assert.equal((await feed()).listings[0].seller_badge,'none');
  assert.equal((await data()).history.length,8);
+
+ // Provisional seller lifecycle exercises the same D1 rows, routes and media gate as production.
+ const files=new Map();
+ env.MEDIA={
+  put:async (key,body,{httpMetadata})=>files.set(key,{body,httpMetadata,size:body.byteLength}),
+  get:async key=>files.get(key)||null,
+  head:async key=>files.get(key)||null,
+  delete:async keys=>keys.forEach(key=>files.delete(key)),
+ };
+ db.exec(`CREATE TABLE auth_email_codes (id TEXT PRIMARY KEY,email TEXT NOT NULL,code_hash TEXT NOT NULL,
+  expires_at TEXT NOT NULL,attempts INTEGER DEFAULT 0,consumed_at TEXT,created_at TEXT)`);
+ env.RESEND_API_KEY='test-mail-key';
+ const emails=[];
+ const fetchBefore=globalThis.fetch;
+ globalThis.fetch=async (url,options)=>{
+  assert.equal(url,'https://api.resend.com/emails');
+  emails.push(JSON.parse(options.body));
+  return new Response(null,{status:200});
+ };
+ try{
+  const partners='/api/admin/partner-pages';
+  const profile={name:'Partner Studio',city:'Lisbon',country:'Portugal',email:'partner@example.test',whatsapp:'+351910000000'};
+  assert.equal((await call(partners,buyer,'POST',profile)).status,403);
+  const created=await call(partners,admin,'POST',profile);
+  assert.equal(created.status,201);
+  const {id:pageId}=await created.json();
+  const path=partners+'/'+pageId;
+  async function draft(title){
+   const form=new FormData();
+   for(const [key,value] of Object.entries({title,description:'A design object',price:'110',category:'Design',source_url:'https://www.vinted.pt/items/10-example'}))form.set(key,value);
+   for(let i=0;i<2;i++)form.append('photo',new Blob([Uint8Array.of(255,216,255,i)],{type:'image/jpeg'}),'test.jpg');
+   const response=await worker.fetch(new Request('https://test.example'+path+'/drafts',{method:'POST',headers:{Authorization:'Bearer '+admin},body:form}),env);
+   assert.equal(response.status,201,await response.clone().text());
+   return (await response.json()).id;
+  }
+  const publicId=await draft('First listing'), privateId=await draft('Second listing');
+  const privateResponse=await call(path+'/preview',admin,'POST');
+  assert.equal(privateResponse.status,200);
+  const previewUrl=new URL((await privateResponse.json()).url);
+  const previewToken=new URLSearchParams(previewUrl.hash.slice(1)).get('preview');
+  const preview=async token=>worker.fetch(new Request('https://test.example/api/partners/preview',{headers:{Authorization:'Preview '+token}}),env);
+  assert.equal((await preview('bad')).status,404);
+  const previewData=await (await preview(previewToken)).json();
+  assert.equal(previewData.listings.length,2);
+  assert.equal(previewData.page.email,undefined);
+  const media=previewData.listings.find(row=>row.id===publicId).photos[0];
+  assert.equal((await worker.fetch(new Request(media),env)).status,404);
+  assert.equal((await worker.fetch(new Request(media,{headers:{Authorization:'Preview '+previewToken}}),env)).status,200);
+  assert.equal((await action(publicId,'show')).status,409);
+  assert.equal((await call(path+'/publish/'+publicId,admin,'POST',{})).status,400);
+  assert.equal((await call(path+'/publish/'+publicId,admin,'POST',{consent:'Seller gave permission by email'})).status,200);
+  const before=(await feed()).listings.find(row=>row.id===publicId);
+  assert.equal(before.seller_name,profile.name);
+  assert.equal(before.seller_id,pageId);
+  assert.equal((await feed()).listings.some(row=>row.id===privateId),false);
+  assert.equal((await worker.fetch(new Request(media),env)).status,200);
+  db.prepare('UPDATE pef_objects SET likes=4,views=23 WHERE id=?').run(publicId);
+  assert.equal((await call(path+'/invite',admin,'POST')).status,200);
+  const invite=new URLSearchParams(new URL(emails[0].text.split('\n').at(-1)).hash.slice(1)).get('invite');
+  assert.equal((await call('/api/auth/code/send',null,'POST',{email:'buyer@example.test',invite})).status,400);
+  assert.equal((await call('/api/auth/code/send',null,'POST',{email:profile.email,invite})).status,200);
+  assert.equal(emails[1].to[0],profile.email);
+  const code=emails[1].text.match(/\b\d{6}\b/)[0];
+  const claimed=await call('/api/auth/code/verify',null,'POST',{email:profile.email,code,invite});
+  assert.equal(claimed.status,200,await claimed.clone().text());
+  const owner=(await claimed.json()).token;
+  assert.equal((await call('/api/auth/code/verify',null,'POST',{email:profile.email,code,invite})).status,400);
+  assert.equal((await preview(previewToken)).status,404);
+  const publishedAfter=(await feed()).listings.find(row=>row.id===publicId);
+  assert.notEqual(publishedAfter.seller_id,pageId);
+  assert.equal(publishedAfter.likes,4);
+  assert.equal(publishedAfter.views,23);
+  const mine=await (await call('/api/listings/mine',owner)).json();
+  assert.deepEqual(new Set(mine.listings.map(row=>row.id)),new Set([publicId,privateId]));
+  const ownerPath='/api/partners/pages/'+pageId;
+  assert.equal((await call(ownerPath,buyer)).status,404);
+  assert.equal((await call(ownerPath+'/profile',owner,'POST',{...profile,whatsapp:'+351920000000'})).status,200);
+  assert.equal((await call(ownerPath+'/publish/'+privateId,owner,'POST',{})).status,200);
+  assert.equal((await feed()).listings.find(row=>row.id===privateId).whatsapp,'+351920000000');
+  assert.equal((await action(publicId,'hide')).status,200);
+  assert.equal((await worker.fetch(new Request(media),env)).status,404);
+ }finally{globalThis.fetch=fetchBefore}
+
 });

@@ -19,18 +19,21 @@ const allowedOrigins=new Set([
 ]);
 const oauthCookie='pef_google_flow';
 const fail=(message,status=400)=>json({error:message},status);
-const validConfig=env=>env.DB&&env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.AUTH_COOKIE_KEY;
-export async function googleAuth(request,env,issueSession) {
+const validConfig=env=>env.DB&&env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.AUTH_COOKIE_KEY&&env.SESSION_SECRET;
+export async function googleAuth(request,env,issueSession, claimPartnerPage) {
  if(!validConfig(env))return fail('Missing auth configuration',503);
  const u=new URL(request.url);
+ const originAllowed=origin=>allowedOrigins.has(origin)||Boolean(env.PEF_PARTNER_APP_ORIGIN&&origin===env.PEF_PARTNER_APP_ORIGIN);
  if(request.method!=='GET')return fail('Method not allowed',405);
  if(u.pathname==='/auth/google/start'){
   let referringOrigin;
   try{referringOrigin=new URL(request.headers.get('Referer')).origin}catch{}
   const requestedOrigin=u.searchParams.get('origin');
-  if(requestedOrigin&&!allowedOrigins.has(requestedOrigin))return fail('Unsupported PEF origin',400);
+  if(requestedOrigin&&!originAllowed(requestedOrigin))return fail('Unsupported PEF origin',400);
   const origin=requestedOrigin||(allowedOrigins.has(referringOrigin)?referringOrigin:
    u.searchParams.get('app')==='production'?productionOrigin:migrationOrigin);
+  const invite=u.searchParams.get('invite')||'';
+  if(invite&&!/^[a-f0-9]{64}$/.test(invite))return fail('Invalid invitation',400);
   const state=random(),verifier=random(48),nonce=random();
   const challenge=b64url(await crypto.subtle.digest('SHA-256',enc.encode(verifier)));
   // The encrypted cookie binds the callback to the browser that initiated the flow.
@@ -40,7 +43,7 @@ export async function googleAuth(request,env,issueSession) {
   if(keyBytes.length!==32)return fail('Invalid cookie key',503);
   const key=await crypto.subtle.importKey('raw',keyBytes,'AES-GCM',false,['encrypt']);
   const iv=crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify({state,verifier,nonce,iat:Date.now(),origin})));
+  const ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify({state,verifier,nonce,iat:Date.now(),origin,invite})));
   const packed=b64url(new Uint8Array([...iv,...new Uint8Array(ciphertext)]));
   const auth=new URL('https://accounts.google.com/o/oauth2/v2/auth');
   for(const [k,v] of Object.entries({client_id:env.GOOGLE_CLIENT_ID,redirect_uri:callbackUrl(request),response_type:'code',scope:'openid email profile',state,nonce,code_challenge:challenge,code_challenge_method:'S256',prompt:'select_account'}))auth.searchParams.set(k,v);
@@ -71,13 +74,16 @@ export async function googleAuth(request,env,issueSession) {
   const profile=await verify.json();
   if(!['accounts.google.com','https://accounts.google.com'].includes(profile.iss)||profile.aud!==env.GOOGLE_CLIENT_ID||profile.nonce!==flow.nonce||![true,'true'].includes(profile.email_verified)||!profile.sub||!profile.email)return fail('Google identity rejected',401);
   const email=String(profile.email).toLowerCase();
-  if(email!=='galeriaparislisboa@gmail.com')return fail('Use the email code for this account',403);
-  const account=await env.DB.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').bind(email).first();
-  if(!account)return fail('Gallery account unavailable',403);
   const returnOrigin=flow.origin??(flow.production===true?productionOrigin:migrationOrigin);
-  if(!allowedOrigins.has(returnOrigin))return fail('Unsupported PEF origin',400);
+  if(!originAllowed(returnOrigin))return fail('Unsupported PEF origin',400);
+  const role=flow.invite?'seller':'gallery';
+  if(flow.invite?['ndondina@muchimuchi.fr','galeriaparislisboa@gmail.com'].includes(email):email!=='galeriaparislisboa@gmail.com')
+   return fail('Sign in with the address invited by PEF',403);
+  const account=flow.invite?await claimPartnerPage(env.DB,flow.invite,email):
+   await env.DB.prepare('SELECT id FROM users WHERE lower(email)=? LIMIT 1').bind(email).first();
+  if(!account)return fail('The account is unavailable or the invitation is invalid or expired',403);
   const origin=JSON.stringify(returnOrigin);
-  const payload=JSON.stringify({type:'pef-google-auth',token:await issueSession(email),role:'gallery'});
+  const payload=JSON.stringify({type:'pef-google-auth',token:await issueSession(email,role,account.id),role});
   const html=`<!doctype html><meta charset="utf-8"><title>PEF sign-in</title><body><script>if(window.opener){window.opener.postMessage(${payload},${origin});setTimeout(()=>window.close(),300)}else{document.body.textContent='Open PEF Design and try again.'}</script>`;
   return new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",'Set-Cookie':cleared,'Referrer-Policy':'no-referrer'}});
  }catch{return new Response(JSON.stringify({error:'Google sign-in failed'}),{status:400,headers:{'Content-Type':'application/json','Set-Cookie':cleared,'Cache-Control':'no-store'}})}

@@ -822,7 +822,7 @@ transform:none!important;
 .pef-like-button svg{fill:none}.pef-like-button[aria-pressed="true"] svg{fill:currentColor}
 .pef-like-button small{font-size:10px;line-height:1;color:inherit;font-variant-numeric:tabular-nums}
 .side .pef-like-button{gap:2px;padding:3px 6px}
-</style><link rel="stylesheet" href="/moderation-ui.css?v=2"><script src="/moderation-ui.js?v=3"></script><style>.pef-newsletter{width:min(96vw,1060px);max-height:90dvh;box-sizing:border-box;border:1px solid #ccc;border-radius:20px;background:#f5f5f5;color:#222;padding:20px;font:14px/1.4 system-ui;overflow:auto}
+</style><link rel="stylesheet" href="/moderation-ui.css?v=2"><link rel="stylesheet" href="/partner-pages.css"><script src="/partner-pages.js"></script><script src="/moderation-ui.js?v=4"></script><style>.pef-newsletter{width:min(96vw,1060px);max-height:90dvh;box-sizing:border-box;border:1px solid #ccc;border-radius:20px;background:#f5f5f5;color:#222;padding:20px;font:14px/1.4 system-ui;overflow:auto}
 .pef-newsletter::backdrop{background:#000b}
 .pef-newsletter header,.pef-newsletter-preview,.pef-newsletter-actions,.pef-newsletter-piece{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pef-newsletter header{margin-bottom:12px}
@@ -1087,7 +1087,7 @@ function readFavoriteIds(){try{const ids=JSON.parse(localStorage.getItem(favorit
 let guestFavorites=readFavoriteIds();
 let accountFavorites=new Set(),likeSyncToken='',likesSyncing=false,likesLoaded=false;
 const pendingLikes=new Map();
-const pefLikesApi='https://pef-design-api.galeriaparislisboa.workers.dev/api/likes';
+const pefLikesApi=window.pefPartners.api+'/api/likes';
 const pefLikeIcon='<svg viewBox="0 0 24 24" aria-hidden="true" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>';
 function saveGuestFavorites(){
  try{localStorage.setItem(favoriteStorageKey,JSON.stringify([...guestFavorites]))}catch{}
@@ -1664,7 +1664,7 @@ async function openPEFPublicSeller(sellerId){
  if(settings?.hidden){pefNotice('info','This gallery profile is hidden.');return;}
  renderPEFPublicSeller(sellerId,settings);
 }
-function renderPEFPublicSeller(sellerId,settings){if(!sellerId||(!pefSellerNames[sellerId]&&(!pefSellerBadges[sellerId]||pefSellerBadges[sellerId]==='none')))return;const name=pefSellerNames[sellerId]||'Verified seller';const badge=pefBadgeLabels[pefSellerBadges[sellerId]]||'✓ Verified seller';const listings=items.filter(x=>String(x.sellerId)===String(sellerId)&&x.remote&&(x.photos?.length||x.url));const sold=listings.filter(x=>x.listingStatus==='sold').length;const root=document.getElementById('pefPublicSellerContent');root.dataset.sellerId=String(sellerId);const place=listings.find(x=>x.city||x.country);const locationLabel=[place?.city,place?.country].filter(Boolean).join(', ');const contact=listings.find(x=>x.phone);const contactDigits=String(contact?.phone||'').replace(/\D/g,'');const isFollowing=false;root.innerHTML=`<div class="pef-public-heading"><div class="pef-public-identity"><div class="pef-public-avatar" id="pefPublicAvatar" aria-label="Seller profile photo"><span>✦</span></div><div class="pef-public-identity-text"><span class="pef-public-badge">${escapeHTML(badge)}</span><h1>${escapeHTML(name)}</h1><div class="pef-public-meta"><span class="pef-meta-entry"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7l9-5Z"/><path d="m3 7 9 5 9-5M12 12v10"/></svg><span>${listings.length} objects${sold>=3?' · '+sold+' sold':''}</span></span>${locationLabel?`<span class="pef-meta-entry pef-seller-location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.6"/></svg><span>${escapeHTML(locationLabel)}</span></span>`:''}</div>${String(sellerId)==='f81528f3-3c3c-4590-9ee9-543f950b6884'?`<a class="pef-seller-website" href="https://www.galeriaparislisboa.com/" target="_blank" rel="noopener noreferrer">Visit website</a>`:''}</div></div><div class="pef-public-buttons"><button type="button" class="pef-public-share" onclick="sharePEFPublicSeller('${sellerId}')" aria-label="Share seller page"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7.5 7.5M12 3l4.5 4.5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg><span>Share profile</span></button><div class="pef-seller-actions"><button type="button" class="pef-subscribe-button" onclick="togglePEFSellerFollow('${sellerId}')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M19 8v6m-3-3h6"/></svg><span>Subscribe</span></button>${contactDigits?`<a href="https://wa.me/${contactDigits}?text=${encodeURIComponent('Hello, I discovered your profile on PEF Design.')}" target="_blank" rel="noopener noreferrer">Contact via WhatsApp</a>`:''}</div></div></div><div class="pef-public-grid">${listings.map((x,cardIndex)=>{const itemIndex=items.findIndex(v=>String(v.id)===String(x.id));return `<article class="pef-public-object" data-object-id="${escapeHTML(String(x.id))}"><button type="button" class="pef-public-cover" onclick="openPEFPublicObject('${x.id}')" aria-label="View ${escapeHTML(x.name)}">${x.photos?.length?`<img src="${escapeHTML(x.photos[0].replace(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(?=v\d+\/)/,'$1w_480,c_limit,q_auto,f_auto/'))}" data-original="${escapeHTML(x.photos[0])}" onerror="this.onerror=null;this.src=this.dataset.original" loading="${cardIndex<2?'eager':'lazy'}" decoding="async" alt="${escapeHTML(x.name)}">`:x.url?`<img src="${escapeHTML(pefPoster(x.url))}" loading="lazy" alt="${escapeHTML(x.name)}" onerror="pefPosterFallback(this)">`:''}</button><div class="pef-public-image-caption"><span class="pef-public-object-name">${escapeHTML(x.name)}</span><span class="pef-public-object-price">${escapeHTML(String(x.price))} € ${pefAvailabilityBadge(x.listingStatus)}${x.negotiable?pefNegotiableBadge:''}</span>${x.city?`<span class="pef-public-location">⌖ ${escapeHTML(x.city)}${x.country?', '+escapeHTML(x.country):''}</span>`:''}</div><div class="pef-public-feed-actions">${pefLikeButton(x)}<button type="button" aria-label="Share" onclick="pefPublicCardShare('${x.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7 8m5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button>${x.phone?`<button type="button" aria-label="Contact via WhatsApp" onclick="pefPublicCardContact('${x.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.5a8.2 8.2 0 0 1-12 7.3L3 20l1.5-5a8.2 8.2 0 1 1 15.7-3.5Z"/><path d="M8.6 8.4c.2-.3.5-.4.8-.2l1.2 1.4-.7 1.1c.8 1.5 1.8 2.5 3.4 3.3l1-.8 1.6 1.2c.3.3.2.6-.1.9-.7.8-1.8.9-2.7.5-2.5-1.1-4.5-3.1-5.5-5.5-.4-.9-.2-1.5 1-1.9Z"/></svg></button>`:''}</div></article>`}).join('')}</div>`;show('sellerPublic');pefPreparePublicVideos();pefRefreshPublicSellerDetails(sellerId);if(settings?.bio){const bio=document.createElement('p');bio.textContent=settings.bio;root.querySelector('.pef-public-heading')?.append(bio)}
+function renderPEFPublicSeller(sellerId,settings){if(!sellerId||(!pefSellerNames[sellerId]&&(!pefSellerBadges[sellerId]||pefSellerBadges[sellerId]==='none')))return;const name=pefSellerNames[sellerId]||'Verified seller';const badge=pefBadgeLabels[pefSellerBadges[sellerId]]||'';const listings=items.filter(x=>String(x.sellerId)===String(sellerId)&&x.remote&&(x.photos?.length||x.url));const sold=listings.filter(x=>x.listingStatus==='sold').length;const root=document.getElementById('pefPublicSellerContent');root.dataset.sellerId=String(sellerId);const place=listings.find(x=>x.city||x.country);const locationLabel=[place?.city,place?.country].filter(Boolean).join(', ');const contact=listings.find(x=>x.phone);const contactDigits=String(contact?.phone||'').replace(/\D/g,'');const isFollowing=false;root.innerHTML=`<div class="pef-public-heading"><div class="pef-public-identity"><div class="pef-public-avatar" id="pefPublicAvatar" aria-label="Seller profile photo"><span>✦</span></div><div class="pef-public-identity-text">${badge?`<span class="pef-public-badge">${escapeHTML(badge)}</span>`:''}<h1>${escapeHTML(name)}</h1><div class="pef-public-meta"><span class="pef-meta-entry"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7l9-5Z"/><path d="m3 7 9 5 9-5M12 12v10"/></svg><span>${listings.length} objects${sold>=3?' · '+sold+' sold':''}</span></span>${locationLabel?`<span class="pef-meta-entry pef-seller-location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.6"/></svg><span>${escapeHTML(locationLabel)}</span></span>`:''}</div>${String(sellerId)==='f81528f3-3c3c-4590-9ee9-543f950b6884'?`<a class="pef-seller-website" href="https://www.galeriaparislisboa.com/" target="_blank" rel="noopener noreferrer">Visit website</a>`:''}</div></div><div class="pef-public-buttons"><button type="button" class="pef-public-share" onclick="sharePEFPublicSeller('${sellerId}')" aria-label="Share seller page"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7.5 7.5M12 3l4.5 4.5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg><span>Share profile</span></button><div class="pef-seller-actions"><button type="button" class="pef-subscribe-button" onclick="togglePEFSellerFollow('${sellerId}')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M19 8v6m-3-3h6"/></svg><span>Subscribe</span></button>${contactDigits?`<a href="https://wa.me/${contactDigits}?text=${encodeURIComponent('Hello, I discovered your profile on PEF Design.')}" target="_blank" rel="noopener noreferrer">Contact via WhatsApp</a>`:''}</div></div></div><div class="pef-public-grid">${listings.map((x,cardIndex)=>{const itemIndex=items.findIndex(v=>String(v.id)===String(x.id));return `<article class="pef-public-object" data-object-id="${escapeHTML(String(x.id))}"><button type="button" class="pef-public-cover" onclick="openPEFPublicObject('${x.id}')" aria-label="View ${escapeHTML(x.name)}">${x.photos?.length?`<img src="${escapeHTML(x.photos[0].replace(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(?=v\d+\/)/,'$1w_480,c_limit,q_auto,f_auto/'))}" data-original="${escapeHTML(x.photos[0])}" onerror="this.onerror=null;this.src=this.dataset.original" loading="${cardIndex<2?'eager':'lazy'}" decoding="async" alt="${escapeHTML(x.name)}">`:x.url?`<img src="${escapeHTML(pefPoster(x.url))}" loading="lazy" alt="${escapeHTML(x.name)}" onerror="pefPosterFallback(this)">`:''}</button><div class="pef-public-image-caption"><span class="pef-public-object-name">${escapeHTML(x.name)}</span><span class="pef-public-object-price">${escapeHTML(String(x.price))} € ${pefAvailabilityBadge(x.listingStatus)}${x.negotiable?pefNegotiableBadge:''}</span>${x.city?`<span class="pef-public-location">⌖ ${escapeHTML(x.city)}${x.country?', '+escapeHTML(x.country):''}</span>`:''}</div><div class="pef-public-feed-actions">${pefLikeButton(x)}<button type="button" aria-label="Share" onclick="pefPublicCardShare('${x.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7 8m5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></button>${x.phone?`<button type="button" aria-label="Contact via WhatsApp" onclick="pefPublicCardContact('${x.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.5a8.2 8.2 0 0 1-12 7.3L3 20l1.5-5a8.2 8.2 0 1 1 15.7-3.5Z"/><path d="M8.6 8.4c.2-.3.5-.4.8-.2l1.2 1.4-.7 1.1c.8 1.5 1.8 2.5 3.4 3.3l1-.8 1.6 1.2c.3.3.2.6-.1.9-.7.8-1.8.9-2.7.5-2.5-1.1-4.5-3.1-5.5-5.5-.4-.9-.2-1.5 1-1.9Z"/></svg></button>`:''}</div></article>`}).join('')}</div>`;show('sellerPublic');pefPreparePublicVideos();pefRefreshPublicSellerDetails(sellerId);if(settings?.bio){const bio=document.createElement('p');bio.textContent=settings.bio;root.querySelector('.pef-public-heading')?.append(bio)}
  if(settings?.avatar){const target=root.querySelector('#pefPublicAvatar');if(target){const img=document.createElement('img');img.src=settings.avatar;img.alt='Gallery profile photo';target.replaceChildren(img)}}
  const storyRows=listings.filter(item=>item.photos?.length).map(item=>({
   id:item.id,seller_id:item.sellerId,title:item.name,description:item.description,price:item.price,photos:item.photos,
@@ -1924,7 +1924,7 @@ async function publish(){
  const editor=document.getElementById('create');editor.inert=true;
  pefPostDraftId=pefPostDraftId||crypto.randomUUID();
  savePendingDraft();
- const api='https://pef-design-api.galeriaparislisboa.workers.dev';
+ const api=window.pefPartners.api;
  const headers={Authorization:'Bearer '+token};
  async function request(path,type,body){
   const response=await fetch(api+path,{method:'POST',headers:{...headers,'Content-Type':type},body});
@@ -2300,7 +2300,7 @@ async function editGallerySettings(host,headers){
  form.append(save,remove,feedback);host.append(form);
 }
 async function openCloudflareProfile(token){
- const api='https://pef-design-api.galeriaparislisboa.workers.dev';
+ const api=window.pefPartners.api;
  const headers={Authorization:'Bearer '+token};
  const response=await fetch(api+'/api/auth/me',{headers});
  if(!response.ok)throw Error('Your session expired. Request a new code.');
@@ -2356,6 +2356,7 @@ async function openCloudflareProfile(token){
  const legacyAdmin=document.getElementById('pefAdminPanel');
  if(legacyAdmin)legacyAdmin.style.display='none';
  panel.classList.toggle('cf-admin-profile',account.role==='admin');
+ if(['admin','seller'].includes(account.role))void window.pefPartners.mount(panel,token,account.role==='admin');
  if(account.role==='admin'){
   window.pefModeration.mount(list,token,(row,onDetailsSaved)=>fridayGalleryListing(row,api,headers,null,onDetailsSaved),loadRemote);
   return;
@@ -2463,7 +2464,7 @@ async function openCloudflareProfile(token){
  await refreshListings();
 }
 async function pefCodeRequest(action, body){
- const response=await fetch('https://pef-design-api.galeriaparislisboa.workers.dev/api/auth/code/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const response=await fetch(window.pefPartners.api+'/api/auth/code/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
  const result=await response.json();
  if(!response.ok)throw Error(result.error||'Sign-in unavailable');
  return result;
@@ -2517,7 +2518,7 @@ document.getElementById('feed')?.addEventListener('scroll',pefCheckInfiniteFeed,
 })();
 
 // Cloudflare D1 public feed: Supabase is no longer the source of public listings.
-const PEF_PUBLIC_FEED_API='https://pef-design-api.galeriaparislisboa.workers.dev/api/text-listings';
+const PEF_PUBLIC_FEED_API=window.pefPartners.api+'/api/text-listings';
 async function pefFetchCloudflareListings(){
  const response=await fetch(PEF_PUBLIC_FEED_API,{headers:{Accept:'application/json'},cache:'no-store'});
  if(!response.ok)throw Error('Cloudflare feed HTTP '+response.status);
@@ -3819,4 +3820,14 @@ if(new URL(location.href).searchParams.get('story')==='preview'){
   if(sample)openPefStory(sample);else alert('No gallery photo is available for this preview.');
  }).catch(()=>alert('Could not load the gallery Content preview.'));
 }
-</script></body></html>
+</script><script>
+if(new URLSearchParams(location.search).get('sellerOnboarded')==='1'){
+ const token=sessionStorage.getItem('pefCloudflareSession');
+ if(token)openCloudflareProfile(token).then(()=>{
+  const url=new URL(location.href);
+  url.searchParams.delete('sellerOnboarded');
+  history.replaceState(null,'',url);
+ }).catch(()=>show('profile'));
+}
+</script>
+</body></html>

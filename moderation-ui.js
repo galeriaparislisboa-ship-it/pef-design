@@ -1,5 +1,5 @@
 (() => {
- const api='https://pef-design-api.galeriaparislisboa.workers.dev';
+ const api=window.pefPartners?.api||'https://pef-design-api.galeriaparislisboa.workers.dev';
  const label={hide:'Masquer',show:'Republier',archive:'Archiver',restore:'Restaurer',resolve:'Traiter',dismiss:'Classer',reopen:'Rouvrir',approve:'Certifier',reject:'Refuser',revoke:'Révoquer'};
  const states={pending:'À traiter',resolved:'Traité',dismissed:'Classé',approved:'Certifié',rejected:'Refusé',revoked:'Révoqué',available:'Disponible',reserved:'Réservé',sold:'Vendu'};
  const el=(tag,text)=>Object.assign(document.createElement(tag),text===undefined?{}:{textContent:text});
