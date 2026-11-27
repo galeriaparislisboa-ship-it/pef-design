@@ -34,6 +34,8 @@
   border-color:#b42318!important;background:#fff0f0!important;color:#741b16!important
 }
 .pef-partners .pef-field-error {display:block;color:#a21818;font-size:.85rem}
+.pef-partners .pef-action-error {color:#a21818!important}
+.pef-partners form label:has(> [aria-invalid="true"]) {color:#a21818!important}
 #pefPublicSellerContent[data-partner-preview] .pef-public-identity img {width:clamp(64px,12vw,94px);height:clamp(64px,12vw,94px);border-radius:50%}
 #pefPublicSellerContent[data-partner-preview] .pef-public-cover .pef-partner-photos {display:block;width:100%;height:100%}
 #pefPublicSellerContent[data-partner-preview] .pef-public-cover .pef-partner-photos img {height:100%;aspect-ratio:auto;object-fit:cover}

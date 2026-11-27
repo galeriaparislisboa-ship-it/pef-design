@@ -23,6 +23,22 @@
     }catch{}
     return null;
   }
+  function marketplaceLinkError(value,platform,profile=false) {
+    if(!platform||!value)return '';
+    let url;
+    try {url=new URL(value)}catch{return 'Enter a valid HTTPS URL.'}
+    const host=url.hostname.replace(/^www\./,'');
+    if(!profile&&platform==='vinted'&&/^vinted\.[a-z.]+$/.test(host)&&host!=='vinted.pt')
+      return 'Flash Connect currently supports Vinted Portugal links (vinted.pt).';
+    if(!profile&&marketplaceListing(value)?.platform===platform)return '';
+    if(profile&&url.protocol==='https:'&&!url.username&&!url.password&&!url.port){
+      const etsyShop=host==='etsy.com'&&/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?shop\/[a-z0-9]+\/?$/i.test(url.pathname);
+      const vintedMember=host==='vinted.pt'&&/^\/member\/\d+(?:-[^/]+)?\/?$/.test(url.pathname);
+      if(platform==='etsy'?etsyShop:vintedMember)return '';
+    }
+    if(platform==='etsy')return profile?'Enter an Etsy shop URL (/shop/…).':'Enter an Etsy listing URL (/listing/…).';
+    return profile?'Enter the Vinted seller profile URL (/member/…), not the item URL.':'Enter a Vinted Portugal item URL (/items/…).';
+  }
   async function flashImport(url,instagramAccount='') {
     const response=await fetch('/api/flash-import?'+new URLSearchParams({url,instagramAccount}));
     const product=await response.json();
@@ -69,9 +85,10 @@
   }
   async function run(control,feedback,work) {
     control.disabled=true;
+    feedback.classList.remove('pef-action-error');
     feedback.textContent='Working…';
     try{feedback.textContent=await work()||''}
-    catch(error){feedback.textContent=error.message}
+    catch(error){feedback.classList.add('pef-action-error');feedback.textContent=error.message}
     finally{control.disabled=false}
   }
   function markInvalid(control,message) {
@@ -463,14 +480,25 @@
         const source=field(sourceFields,'listing_url','Listing URL',{type:'url',max:1500,required:false});
         const seller=field(sourceFields,'seller_url','Seller profile URL',{type:'url',max:500,required:false});
         const importStatus=status();
+        const validateLink=(input,profile=false)=>input.setCustomValidity(marketplaceLinkError(input.value,platform.value,profile));
+        source.addEventListener('input',()=>{validateLink(source);importStatus.textContent=''});
+        seller.addEventListener('input',()=>validateLink(seller,true));
         let imported;
         sourceFields.append(button('Flash Connect',control=>run(control,importStatus,async()=>{
-          if(marketplaceListing(source.value)?.platform!==platform.value)throw Error('Enter a listing URL for the selected marketplace.');
+          validateLink(source);
+          if(!source.checkValidity()){
+            source.focus();
+            return;
+          }
           const url=source.value;
           const product=await flashImport(url);
           if(url!==source.value||marketplaceListing(url)?.platform!==platform.value)return;
           imported={url,product};
-          if(product.seller?.url&&!seller.value)seller.value=product.seller.url;
+          if(product.seller?.url&&!seller.value){
+            seller.value=product.seller.url;
+            validateLink(seller,true);
+            clearInvalid(seller);
+          }
           if(product.seller?.name&&!form.elements.name.value)form.elements.name.value=product.seller.name;
           return 'Listing found. Confirm the seller details below.';
         })),importStatus);
@@ -480,6 +508,10 @@
           source.required=seller.required=Boolean(platform.value);
           form.elements.email.required=!platform.value;
           source.disabled=seller.disabled=!platform.value;
+          for(const input of [source,seller]){
+            validateLink(input,input===seller);
+            clearInvalid(input);
+          }
           source.placeholder=platform.value==='etsy'?'https://www.etsy.com/listing/…':'https://www.vinted.pt/items/…';
           seller.placeholder=platform.value==='etsy'?'https://www.etsy.com/shop/…':'https://www.vinted.pt/member/…';
         };
@@ -490,7 +522,15 @@
         };
         updateSource();
         submit(form,'Create provisional page',status(),async()=>{
-          if(platform.value&&marketplaceListing(source.value)?.platform!==platform.value)throw Error('Enter a listing URL for the selected marketplace.');
+          if(platform.value){
+            validateLink(source);
+            validateLink(seller,true);
+            const invalid=[source,seller].filter(input=>!input.checkValidity());
+            if(invalid.length){
+              invalid[0].focus();
+              return;
+            }
+          }
           const initial=platform.value
             ?{url:source.value,product:imported?.url===source.value?imported.product:null}:undefined;
           const {id}=await request(prefix,headers,'POST',values(form));
