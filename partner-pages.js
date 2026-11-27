@@ -79,6 +79,18 @@
     }
     throw Error('An image could not be compressed.');
   }
+  function categoryField(form,value='') {
+    const label=element('label','Category'), select=element('select');
+    select.name='category';
+    select.required=true;
+    select.add(new Option('Choose a category',''));
+    const options=document.getElementById('category')?.options||[];
+    for(const option of options)if(option.value&&option.value!=='All')select.add(new Option(option.text,option.value));
+    if(value&&value!=='All'&&![...select.options].some(option=>option.value===value))select.add(new Option(value,value));
+    select.value=value==='All'?'':value;
+    label.append(select);form.append(label);
+    return select;
+  }
   function draftForm(path,headers,refresh) {
     const form=element('form'), feedback=status(), importFeedback=status();
     const source=field(form,'source_url','Listing URL',{type:'url',max:1500,required:false});
@@ -133,12 +145,7 @@
     field(form,'title','Title',{max:60});
     field(form,'description','Description',{type:'textarea',max:80,required:false});
     field(form,'price','Price (€)',{type:'number',required:false});
-    const label=element('label','Category'), category=element('select');
-    category.name='category';
-    const categories=document.querySelector('#create #category')?.options||document.getElementById('category')?.options||[];
-    category.add(new Option('Choose a category',''));
-    for(const option of categories)if(option.value&&option.value!=='All')category.add(new Option(option.text,option.value));
-    label.append(category);form.append(label);
+    categoryField(form).required=false;
     const pick=element('input');
     pick.type='file';pick.accept='image/*';pick.multiple=true;
     pick.onchange=()=>{
@@ -187,7 +194,7 @@
         field(form,'title','Title',{value:listing.title,max:60});
         field(form,'description','Description',{value:listing.description,type:'textarea',max:80,required:false});
         field(form,'price','Price (€)',{value:listing.price,type:'number'});
-        field(form,'category','Category',{value:listing.category,max:60});
+        categoryField(form,listing.category||'');
         field(form,'city','City',{value:listing.city,max:60});
         field(form,'country','Country',{value:listing.country,max:60});
         field(form,'whatsapp','WhatsApp',{value:listing.whatsapp,type:'tel',max:20});
