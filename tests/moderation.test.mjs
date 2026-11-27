@@ -138,6 +138,9 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   const logo='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
   assert.equal((await call(path+'/presentation',admin,'POST',{logo})).status,200);
   assert.equal((await call(path+'/presentation',admin,'POST',{public:true})).status,403);
+  const sellerDetails={bio:'Independent bookshop in Lisbon',website:'https://example.test/',instagram:'@test.books',whatsapp:profile.whatsapp};
+  assert.equal((await call(path+'/details',admin,'POST',sellerDetails)).status,200);
+  assert.equal((await call(path+'/details',admin,'POST',{...sellerDetails,website:'javascript:alert(1)'})).status,400);
   const publicId=await draft('First listing'), privateId=await draft('Second listing');
   const privateResponse=await call(path+'/preview',admin,'POST');
   assert.equal(privateResponse.status,200);
@@ -149,6 +152,8 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   assert.equal(previewData.listings.length,2);
   assert.equal(previewData.page.email,undefined);
   assert.equal(previewData.page.logo,logo);
+  assert.equal(previewData.page.bio,sellerDetails.bio);
+  assert.equal(previewData.page.instagram,'test.books');
   const media=previewData.listings.find(row=>row.id===publicId).photos[0];
   assert.equal((await worker.fetch(new Request(media),env)).status,404);
   assert.equal((await worker.fetch(new Request(media,{headers:{Authorization:'Preview '+previewToken}}),env)).status,200);
@@ -186,7 +191,9 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   assert.equal(publishedAfter.seller_profile_hidden,1);
   assert.equal((await call(publicPage)).status,404);
   assert.equal((await call(ownerPath+'/presentation',owner,'POST',{public:true})).status,200);
-  assert.equal((await call(publicPage)).status,200);
+  const publicResponse=await call(publicPage);
+  assert.equal(publicResponse.status,200);
+  assert.equal((await publicResponse.json()).website,sellerDetails.website);
   assert.equal((await feed()).listings.find(row=>row.id===publicId).seller_profile_hidden,0);
   assert.equal((await call(ownerPath+'/presentation',owner,'POST',{public:false})).status,200);
   assert.equal((await call(publicPage)).status,404);

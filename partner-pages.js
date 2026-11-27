@@ -311,8 +311,39 @@
     })));
     return form;
   }
+  function profileExtras(host,page) {
+    const actions=element('div');actions.className='pef-seller-actions pef-partner-links';
+    const addLink=(label,target)=>{
+      const link=element('a',label);link.href=target;link.target='_blank';link.rel='noopener noreferrer';actions.append(link);
+    };
+    if(page.website)addLink('Visit website',page.website);
+    if(page.instagram)addLink('Instagram','https://www.instagram.com/'+encodeURIComponent(page.instagram)+'/');
+    if(page.whatsapp){
+      const number=page.whatsapp.replace(/\D/g,'');
+      if(number)addLink('Contact via WhatsApp','https://wa.me/'+number);
+    }
+    if(actions.childElementCount)host.append(actions);
+    if(page.bio){
+      const bio=element('p',page.bio);bio.className='pef-public-bio pef-partner-bio';host.append(bio);
+    }
+  }
+  function sellerDetails(path,headers,page,refresh) {
+    const form=element('form');
+    field(form,'bio','Description',{type:'textarea',value:page.bio,max:600,required:false});
+    field(form,'website','Website',{type:'url',value:page.website,max:500,required:false});
+    field(form,'instagram','Instagram username',{value:page.instagram,max:31,required:false});
+    field(form,'whatsapp','WhatsApp',{type:'tel',value:page.whatsapp,max:20,required:false});
+    submit(form,'Save seller details',status(),async()=>{
+      await request(path+'/details',headers,'POST',values(form));
+      await refresh();
+    });
+    return form;
+  }
+
   function renderPreview(host,page,listings,headers) {
-    host.append(profileHeader(page),element('h2','Listings'));
+    host.append(profileHeader(page));
+    profileExtras(host,page);
+    host.append(element('h2','Listings'));
     const grid=element('div');grid.className='pef-partner-preview-grid';host.append(grid);
     showListings(grid,listings,headers);
     if(!listings.length)host.append(element('p','No listings yet.'));
@@ -327,6 +358,7 @@
     const title=identity.querySelector('h2');
     title.replaceWith(element('h1',page.name));
     heading.append(identity,element('p',listings.length+' objects · Private preview'));
+    profileExtras(heading,page);
     const grid=element('div');grid.className='pef-public-grid';
     for(const listing of listings){
       const card=element('article');card.className='pef-public-object';
@@ -398,6 +430,11 @@
           const latest=await request(path,headers);
           viewPage(latest.page,latest.listings,headers);
         })));
+      if(!admin||!page.owner_id){
+        const details=element('details');
+        details.append(element('summary','Seller details'),sellerDetails(path,headers,page,()=>open(id)));
+        body.append(details);
+      }
       const logo=element('details');
       logo.append(element('summary','Partner logo'),logoEditor(path,headers,page,()=>open(id)));body.append(logo);
       if(admin&&!page.owner_id){
@@ -503,7 +540,7 @@
     }catch(error){feedback.textContent=error.message}
   }
 
-  window.pefPartners={mount,api,session,back};
+  window.pefPartners={mount,api,session,back,profileExtras};
   const onboardingHost=document.getElementById('pef-partner-onboarding');
   if(onboardingHost)void onboarding(onboardingHost);
 })();

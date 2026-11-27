@@ -1,4 +1,5 @@
 const tables = [
+  "CREATE TABLE IF NOT EXISTS pef_partner_details (page_id TEXT PRIMARY KEY, bio TEXT NOT NULL, website TEXT NOT NULL, instagram TEXT NOT NULL)",
   'CREATE TABLE IF NOT EXISTS pef_partner_presentation (page_id TEXT PRIMARY KEY, logo TEXT, public INTEGER NOT NULL DEFAULT 0)',
   "CREATE TABLE IF NOT EXISTS pef_deleted_accounts (user_id TEXT PRIMARY KEY, deleted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)",
   `CREATE TABLE IF NOT EXISTS pef_partner_pages (

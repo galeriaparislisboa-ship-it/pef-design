@@ -39,3 +39,6 @@
 #pefPublicSellerContent[data-partner-preview] .pef-public-cover .pef-partner-photos img {height:100%;aspect-ratio:auto;object-fit:cover}
 .pef-partner-object-preview {width:min(92vw,700px);max-height:88dvh;border:1px solid #626266;border-radius:14px;background:#171717;color:#fff}
 .pef-partner-object-preview button {padding:8px 14px;border-radius:8px}
+.pef-partner-links {display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.pef-partner-links a {color:inherit}
+.pef-partner-bio {white-space:pre-line;line-height:1.5;overflow-wrap:anywhere}

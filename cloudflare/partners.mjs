@@ -45,7 +45,7 @@ export async function claimPartnerPage(db, token, email) {
 async function findPreview(db, token) {
   if (!tokenPattern.test(token || '')) return null;
   const digest=await sha(token),now=Date.now();
-  return query(db, `SELECT id,name,city,country,(SELECT logo FROM pef_partner_presentation WHERE page_id=pef_partner_pages.id) AS logo FROM pef_partner_pages
+  return query(db, `SELECT id,name,city,country,whatsapp,(SELECT logo FROM pef_partner_presentation WHERE page_id=pef_partner_pages.id) AS logo FROM pef_partner_pages
     WHERE ((preview_hash=? AND preview_until>?) OR (invite_hash=? AND invite_until>?)) AND owner_id IS NULL
     AND NOT EXISTS(SELECT 1 FROM pef_archived_accounts WHERE user_id=pef_partner_pages.id)`,
     digest,now,digest,now).first();
@@ -148,7 +148,7 @@ export async function partners(request,env,user,out) {
     if (path.startsWith('/api/partners/public-profile/') && method==='GET') {
       const owner=path.split('/').at(-1);
       if(!idPattern.test(owner))return out({error:'Seller page unavailable'},404);
-      const profile=await query(db,`SELECT s.logo FROM pef_partner_presentation s JOIN pef_partner_pages p ON p.id=s.page_id
+      const profile=await query(db,`SELECT s.logo,d.bio,d.website,d.instagram,p.whatsapp FROM pef_partner_presentation s JOIN pef_partner_pages p ON p.id=s.page_id LEFT JOIN pef_partner_details d ON d.page_id=p.id
         WHERE p.owner_id=? AND s.public=1 AND NOT EXISTS(SELECT 1 FROM pef_archived_accounts WHERE user_id=p.owner_id)
         AND EXISTS(SELECT 1 FROM pef_partner_listings l JOIN pef_objects o ON o.id=l.id
           WHERE l.page_id=p.id AND l.published_at IS NOT NULL AND o.is_hidden=0) ORDER BY p.id LIMIT 1`,owner).first();
@@ -158,7 +158,8 @@ export async function partners(request,env,user,out) {
       const page = await findPreview(db,request.headers.get('Authorization')?.replace(/^Preview /,''));
       if (!page) return out({error:'This private link has expired or been replaced'},404);
       const listings = await pageListings(db,page.id);
-      return out({page,listings:listings.map(({id,title,description,price,photos,is_hidden})=>({id,title,description,price,photos,is_hidden}))});
+      const details=await query(db,'SELECT bio,website,instagram FROM pef_partner_details WHERE page_id=?',page.id).first();
+      return out({page:{...page,...details},listings:listings.map(({id,title,description,price,photos,is_hidden})=>({id,title,description,price,photos,is_hidden}))});
     }
     if (path==='/api/admin/partner-pages' && method==='GET') {
       return out({pages:await rows(db,`SELECT id,name,city,country,email,whatsapp,owner_id,preview_until,invite_until
@@ -188,11 +189,36 @@ export async function partners(request,env,user,out) {
     if (!user) return out({error:'Sign in to manage this page'},401);
     const [id,action,listing,...rest] = path.slice(prefix.length+1).split('/');
     if (rest.length||!idPattern.test(id)) return out({error:'Not found'},404);
-    const page = await query(db,`SELECT p.*,s.logo,s.public FROM pef_partner_pages p LEFT JOIN users u ON u.id=p.owner_id LEFT JOIN pef_partner_presentation s ON s.page_id=p.id
+    const page = await query(db,`SELECT p.*,s.logo,s.public,d.bio,d.website,d.instagram FROM pef_partner_pages p LEFT JOIN users u ON u.id=p.owner_id LEFT JOIN pef_partner_presentation s ON s.page_id=p.id LEFT JOIN pef_partner_details d ON d.page_id=p.id
       WHERE p.id=? AND (?=1 OR lower(u.email)=?) AND NOT EXISTS(SELECT 1 FROM pef_deleted_accounts d WHERE d.user_id=p.id OR d.user_id=p.owner_id)`,id,Number(admin),user.email.toLowerCase()).first();
     if (!page) return out({error:'Seller page not found'},404);
-    if (!action && method==='GET') return out({page:{id,name:page.name,city:page.city,country:page.country,whatsapp:page.whatsapp,owner_id:page.owner_id,logo:page.logo,public:Boolean(page.public)},listings:await pageListings(db,id)});
+    if (!action && method==='GET') return out({page:{id,name:page.name,city:page.city,country:page.country,whatsapp:page.whatsapp,owner_id:page.owner_id,logo:page.logo,bio:page.bio,website:page.website,instagram:page.instagram,public:Boolean(page.public)},listings:await pageListings(db,id)});
     if (method!=='POST') return out({error:'Method not allowed'},405);
+    if (action==='details' && !listing) {
+      if(admin&&page.owner_id)return out({error:'The seller manages these details'},409);
+      const data=await request.json().catch(()=>null);
+      if(!data||!['bio','website','instagram','whatsapp'].every(key=>typeof data[key]==='string'))
+        return out({error:'Invalid seller details'},400);
+      const bio=data.bio.trim(), whatsapp=data.whatsapp.trim(), instagram=data.instagram.trim().replace(/^@/,'');
+      let website=data.website.trim();
+      if(bio.length>600||website.length>500||(instagram&&!/^[a-z0-9_.]{1,30}$/i.test(instagram))||(whatsapp&&!isPhone(whatsapp)))
+        return out({error:'Check the description, Instagram username or WhatsApp number'},400);
+      if(website){
+        try{
+          const parsed=new URL(website);
+          if(!['https:','http:'].includes(parsed.protocol)||parsed.username||parsed.password)throw Error();
+          website=parsed.href;
+        }catch{return out({error:'Enter a website URL starting with https:// or http://'},400)}
+      }
+      const owner=page.owner_id||'';
+      const result=await db.batch([
+        query(db,`INSERT INTO pef_partner_details(page_id,bio,website,instagram)
+          SELECT id,?,?,? FROM pef_partner_pages WHERE id=? AND COALESCE(owner_id,'')=?
+          ON CONFLICT(page_id) DO UPDATE SET bio=excluded.bio,website=excluded.website,instagram=excluded.instagram`,bio,website,instagram,id,owner),
+        query(db,"UPDATE pef_partner_pages SET whatsapp=? WHERE id=? AND COALESCE(owner_id,'')=?",whatsapp,id,owner),
+      ]);
+      return result[0].meta.changes ? out({ok:true}) : out({error:'Page ownership changed'},409);
+    }
     if (action==='presentation' && !listing) {
       const data=await request.json().catch(()=>null);
       if(Object.hasOwn(data||{},'logo')){
