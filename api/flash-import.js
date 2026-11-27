@@ -134,7 +134,7 @@ async function importApoc(url){
  if(!path||(variantId!==null&&!/^\d+$/.test(variantId)))throw Error('Enter a valid APOC Store product URL.');
  const root='https://apoc-store.com';
  const [product,cart]=await Promise.all([path+'.js','/cart.js'].map(async endpoint=>{
-  const result=await retrieve(new URL(endpoint+'?currency=EUR',root),apocPages,1024*1024,'application/json');
+  const result=await retrieve(new URL(endpoint+'?currency=EUR',root),apocPages,1024*1024,'application/json,text/javascript');
   return JSON.parse(result.body.toString('utf8'));
  }));
  const variants=product.variants||[];
