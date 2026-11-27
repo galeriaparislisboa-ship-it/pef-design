@@ -19,3 +19,7 @@
 #pefCloudflareProfile .pef-moderation input[type="search"]{background:#fff;color:#1c1c1e;width:100%}
 
 .pef-moderation > [hidden]{display:none}
+
+#profile:has(#pefCloudflareProfile.cf-admin-profile){padding-top:calc(var(--pef-admin-header-bottom, 90px) + 18px)!important}
+#pefCloudflareProfile .pef-moderation nav{scroll-margin-top:calc(var(--pef-admin-header-bottom, 90px) + 12px)}
+#pefCloudflareProfile .pef-moderation .pef-delete-account{background:#f2a7ae;color:#401418;border-color:#d7818b}

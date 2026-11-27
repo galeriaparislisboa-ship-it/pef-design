@@ -19,8 +19,9 @@ async function authorize(request,env){
  const user=await verifySession(request,env);
  if(!user||user.role==='admin'||!env.DB)return user;
  await initializeModeration(env.DB);
- const archived=await env.DB.prepare('SELECT 1 FROM pef_archived_accounts a JOIN users u ON u.id=a.user_id WHERE lower(u.email)=?').bind(user.email.toLowerCase()).first();
- return archived?null:user;
+ const account=await env.DB.prepare(`SELECT u.id FROM users u WHERE lower(u.email)=? AND (? IS NULL OR u.id=?)
+   AND NOT EXISTS (SELECT 1 FROM pef_archived_accounts a WHERE a.user_id=u.id)`).bind(user.email.toLowerCase(),user.userId??null,user.userId??null).first();
+ return account?user:null;
 }
 function validPostId(value){return typeof value==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)}
 const parseArray=(value)=>{if(Array.isArray(value))return value;if(typeof value!=='string')return [];try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[]}catch{return []}};

@@ -1,6 +1,6 @@
 (() => {
  const api=window.pefPartners?.api||'https://pef-design-api.galeriaparislisboa.workers.dev';
- const label={hide:'Masquer',show:'Republier',archive:'Archiver',restore:'Restaurer',resolve:'Traiter',dismiss:'Classer',reopen:'Rouvrir',approve:'Certifier',reject:'Refuser',revoke:'Révoquer'};
+ const label={delete_account:'Supprimer le compte',hide:'Masquer',show:'Republier',archive:'Archiver',restore:'Restaurer',resolve:'Traiter',dismiss:'Classer',reopen:'Rouvrir',approve:'Certifier',reject:'Refuser',revoke:'Révoquer'};
  const states={pending:'À traiter',resolved:'Traité',dismissed:'Classé',approved:'Certifié',rejected:'Refusé',revoked:'Révoqué',available:'Disponible',reserved:'Réservé',sold:'Vendu'};
  const el=(tag,text)=>Object.assign(document.createElement(tag),text===undefined?{}:{textContent:text});
  const button=(text,run)=>Object.assign(el('button',text),{type:'button',onclick:run});
@@ -130,8 +130,10 @@
    const box=el('div'), note=Object.assign(el('textarea'),{maxLength:500,rows:2,placeholder:'Note facultative dans l’historique'});
    note.setAttribute('aria-label','Note de modération');
    box.className='pef-decision';box.append(note);
-   for(const action of actions)box.append(button(label[action],async()=>{
+   for(const action of actions){
+    const control=button(label[action],async()=>{
     if(busy)return;
+    if(action==='delete_account'&&!confirm('Supprimer définitivement le compte '+(row.email||row.display_name)+' ?'))return;
     if(['archive','revoke'].includes(action)&&!confirm(label[action]+' ce compte ?'))return;
     busy=true;refreshButton.disabled=true;feedback.textContent='Enregistrement…';
     try{
@@ -141,7 +143,10 @@
      if(['archive','restore','hide','show','approve','revoke'].includes(action))await reloadFeed().catch(()=>{feedback.textContent='Décision enregistrée. Actualisez le flux public pour voir le changement.'});
     }catch(error){feedback.textContent=error.message}
     finally{busy=false;refreshButton.disabled=false}
-   }));
+    });
+    if(action==='delete_account')control.classList.add('pef-delete-account');
+    box.append(control);
+   }
    host.append(box);
   }
   function match(row,value){
@@ -201,7 +206,7 @@
       if(category)category.value='';
       selectSection('listings',row.id);
      }));
-     if(row.email?.toLowerCase()!=='ndondina@muchimuchi.fr')decisions(item.content,row,[row.archived_at?'restore':'archive']);
+     if(row.email?.toLowerCase()!=='ndondina@muchimuchi.fr')decisions(item.content,row,[row.archived_at?'restore':'archive',...(Number(row.can_delete)?['delete_account']:[])]);
     }else if(active==='reports'){
      item=card(row.title||'Annonce indisponible',states[row.status]+' · '+row.reason);
      item.content.append(el('p',[row.reporter,formatDate(row.created_at)].filter(Boolean).join(' · ')),el('p',row.details||''));

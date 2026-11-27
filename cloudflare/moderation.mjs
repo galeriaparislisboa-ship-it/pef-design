@@ -34,9 +34,13 @@ export function initializeModeration(db) {
 
 const reasons = new Set(['Inappropriate content', 'Misleading listing', 'Spam', 'Other']);
 const listingColumns = `id,seller_id,title,description,price,category,city,country,whatsapp,listing_status,promotion_price,object_date,negotiable,trade,views,${listingLikeCount},whatsapp_clicks,photos,video_url,media_order,is_hidden,created_at`;
+const protectedGalleryId='f81528f3-3c3c-4590-9ee9-543f950b6884';
 const accountQuery = `SELECT u.id,u.email,u.display_name,a.archived_at,b.badge,
   CASE WHEN p.user_id IS NOT NULL OR lower(u.email)='galeriaparislisboa@gmail.com' THEN 1 ELSE 0 END AS gallery,
-  (SELECT COUNT(*) FROM pef_objects WHERE seller_id=u.id) AS listings
+  (SELECT COUNT(*) FROM pef_objects WHERE seller_id=u.id) AS listings,
+  (u.id<>'${protectedGalleryId}' AND lower(u.email)<>'ndondina@muchimuchi.fr'
+    AND NOT EXISTS(SELECT 1 FROM pef_objects WHERE seller_id=u.id)
+    AND NOT EXISTS(SELECT 1 FROM pef_partner_pages WHERE id=u.id OR owner_id=u.id)) AS can_delete
   FROM users u LEFT JOIN pef_archived_accounts a ON a.user_id=u.id
   LEFT JOIN pef_seller_profiles p ON p.user_id=u.id LEFT JOIN pef_seller_badges b ON b.seller_id=u.id`;
 
@@ -109,6 +113,10 @@ export async function moderation(request, db, user, out) {
     if (action==='hide' || action==='show') {
       change=query(`UPDATE pef_objects SET is_hidden=? WHERE id=? AND COALESCE(is_hidden,0)<>?
         AND (?='hide' OR NOT EXISTS(SELECT 1 FROM pef_partner_listings WHERE id=pef_objects.id AND published_at IS NULL))`,Number(action==='hide'),id,Number(action==='hide'),action);
+    } else if (action==='delete_account') {
+      change=query(`DELETE FROM users WHERE id=? AND id<>? AND lower(email)<>'ndondina@muchimuchi.fr'
+        AND NOT EXISTS(SELECT 1 FROM pef_objects WHERE seller_id=users.id)
+        AND NOT EXISTS(SELECT 1 FROM pef_partner_pages WHERE id=users.id OR owner_id=users.id)`,id,protectedGalleryId);
     } else if (action==='archive' || action==='restore') {
       const target=await query('SELECT email FROM users WHERE id=?',id).first();
       if (!target) return out({error:'Account not found'},404);
@@ -129,9 +137,14 @@ export async function moderation(request, db, user, out) {
     } else return out({error:'Unknown action'},400);
     const history=query(`INSERT INTO pef_moderation_log (id,actor,target,action,note)
       SELECT ?,?,?,?,? WHERE changes()=1`,crypto.randomUUID(),user.email,id,action,note);
-    const result=await db.batch([change,history,...(followup ? [followup] : [])]);
+    const cleanup=action==='delete_account'?[query(`DELETE FROM pef_archived_accounts WHERE user_id=?
+      AND NOT EXISTS(SELECT 1 FROM users WHERE id=?)`,id,id)]:[];
+    const result=await db.batch([change,history,...cleanup,...(followup ? [followup] : [])]);
+    if(action==='delete_account'&&!result[0].meta.changes)return out({error:'Ce compte est protégé, possède des annonces ou est lié à une page vendeur.'},409);
     return result[0].meta.changes ? out({ok:true}) : out({error:'This item has already changed or is unavailable. Refresh the queue.'},409);
   } catch (error) {
+    if(/FOREIGN KEY constraint failed/i.test(error.message))
+      return out({error:'Ce compte est lié à des données PEF. Utilisez Archiver pour le désactiver.'},409);
     console.error('Moderation:',error.message);
     return out({error:'Moderation temporarily unavailable'},503);
   }

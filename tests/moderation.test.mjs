@@ -183,4 +183,16 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   assert.equal((await worker.fetch(new Request(media),env)).status,404);
  }finally{globalThis.fetch=fetchBefore}
 
+ db.prepare('INSERT INTO users(id,email,display_name) VALUES (?,?,?)').run('empty','empty@example.test','Empty account');
+ const empty=await session('empty@example.test','seller');
+ assert.equal((await call('/api/auth/me',empty)).status,200);
+ assert.equal((await data()).accounts.find(row=>row.id==='empty').can_delete,1);
+ assert.equal((await data()).accounts.find(row=>row.id==='seller').can_delete,0);
+ assert.equal((await action('admin','delete_account')).status,409);
+ assert.equal((await action('seller','delete_account')).status,409);
+ assert.equal((await action('empty','delete_account')).status,200);
+ assert.equal((await call('/api/auth/me',empty)).status,401);
+ assert.equal((await data()).accounts.some(row=>row.id==='empty'),false);
+ assert.equal((await data()).history[0].action,'delete_account');
+
 });
