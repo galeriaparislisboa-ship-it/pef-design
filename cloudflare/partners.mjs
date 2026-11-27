@@ -22,6 +22,12 @@ function marketplaceUrl(value,profile=false) {
       :url.pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?listing\/(\d+)(?:\/[^/]+)?\/?$/i);
     if(match)return {platform:'etsy',url:'https://www.etsy.com/'+(profile?'shop/':'listing/')+match[1]};
   }
+  if(host==='apoc-store.com'){
+    const valid=profile?/^\/(?:collections\/[a-z0-9-]+\/?)?$/i:/^\/products\/[a-z0-9-]+\/?$/i;
+    const variant=profile?null:url.searchParams.get('variant');
+    if(valid.test(url.pathname)&&(variant===null||/^\d+$/.test(variant)))
+      return {platform:'apoc',url:'https://apoc-store.com'+(url.pathname.replace(/\/$/,'')||'/')+(variant?'?variant='+variant:'')};
+  }
   if(host==='vinted.pt'||host==='vinted.it'){
     const match=url.pathname.match(profile?/^\/member\/(\d+)(?:-[^/]+)?\/?$/:/^\/items\/(\d+)(?:-[^/]+)?\/?$/);
     if(match)return {platform:host==='vinted.it'?'vinted-it':'vinted-pt',url:'https://www.'+host+(profile?'/member/'+match[1]:url.pathname.replace(/\/$/,''))};

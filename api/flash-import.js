@@ -2,12 +2,16 @@ const pages=new Set(['galeriaparislisboa.com','www.galeriaparislisboa.com']);
 const images=new Set([...pages,'images.squarespace-cdn.com','static1.squarespace.com']);
 const vintedPages=new Set(['www.vinted.pt','vinted.pt','www.vinted.it','vinted.it']);
 const vintedImages=new Set(Array.from({length:4},(_,index)=>'images'+(index+1)+'.vinted.net'));
+const apocPages=new Set(['apoc-store.com','www.apoc-store.com']);
+const apocImageHost='cdn.shopify.com';
+images.add(apocImageHost);
 const etsyPages=new Set(['www.etsy.com','etsy.com']);
 const etsyImages=new Set(['i.etsystatic.com']);
 for(const host of [...vintedImages,...etsyImages])images.add(host);
 function allowed(value,hosts,base){
  try{
   const url=new URL(value,base);
+  if(url.hostname===apocImageHost&&!url.pathname.startsWith('/s/files/1/0275/2521/8384/'))return null;
   return url.protocol==='https:'&&!url.username&&!url.password&&!url.port&&(hosts.has(url.hostname)||(hosts===images&&/(?:^|\.)(?:cdninstagram\.com|fbcdn\.net)$/.test(url.hostname)))?url:null;
  }catch{return null}
 }
@@ -124,6 +128,27 @@ function extractVinted(html,url){
  if(gallery.size)product.photos=[...new Set([...gallery].sort(([a],[b])=>a-b).map(([,photo])=>photo))].slice(0,5);
  return product;
 }
+async function importApoc(url){
+ const path=url.pathname.match(/^\/products\/[a-z0-9-]+(?=\/?$)/i)?.[0];
+ const variantId=url.searchParams.get('variant');
+ if(!path||(variantId!==null&&!/^\d+$/.test(variantId)))throw Error('Enter a valid APOC Store product URL.');
+ const root='https://apoc-store.com';
+ const [product,cart]=await Promise.all([path+'.js','/cart.js'].map(async endpoint=>{
+  const result=await retrieve(new URL(endpoint+'?currency=EUR',root),apocPages,1024*1024,'application/json');
+  return JSON.parse(result.body.toString('utf8'));
+ }));
+ const variants=product.variants||[];
+ const variant=variantId===null?(variants.find(item=>item.available)||variants[0]):variants.find(item=>String(item.id)===variantId);
+ if(!variant)throw Error('The selected APOC Store variant was not found.');
+ const variantImage=variant.featured_image?.src;
+ const candidates=variants.length===1?[variantImage,product.featured_image,...(product.images||[])]:[variantImage];
+ const photos=[...new Set(candidates.filter(Boolean).map(image=>allowed(image,images,root)?.href).filter(Boolean))].slice(0,5);
+ const designer=plain(product.vendor);
+ const handle=designer.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+ return {title:plain(variant.public_title?variant.name:product.title),description:plain(product.description),
+  price:cart.currency==='EUR'&&Number.isSafeInteger(variant.price)?euroPrice(variant.price/100):null,photos,
+  seller:handle?{name:designer,url:root+'/collections/'+handle}:{name:'APOC Store',url:root}};
+}
 async function importEtsy(id){
  const key=(process.env.ETSY_API_KEY||'').trim();
  if(!key)throw Error('Etsy automatic import is not configured. Enter listing details and add photos manually.');
@@ -200,12 +225,17 @@ module.exports=async function handler(req,res){
   try{return res.status(200).json(await importEtsy(id))}
   catch(error){return res.status(422).json({error:error.message||'Etsy import unavailable.'})}
  }
+ const apoc=!image&&typeof input==='string'&&input.length<=2500?allowed(input,apocPages):null;
+ if(apoc){
+  try{return res.status(200).json(await importApoc(apoc))}
+  catch(error){return res.status(422).json({error:error.message||'APOC Store import unavailable.'})}
+ }
  const vinted=!image&&typeof input==='string'&&input.length<=2500?allowed(input,vintedPages):null;
  if(vinted&&!/^\/items\/\d+(?:-[^/]+)?\/?$/.test(vinted.pathname))return res.status(400).json({error:'Enter a Vinted Portugal or Vinted Italy listing URL.'});
  if(vinted)vinted.search='';
  const hosts=image?images:vinted?vintedPages:pages;
  const url=vinted||(typeof input==='string'&&input.length<=2500?allowed(input,hosts):null);
- if(!url)return res.status(400).json({error:'Enter a Galerie Paris–Lisboa product URL, a Vinted (Portugal or Italy) or Etsy listing URL, or an Instagram post URL.'});
+ if(!url)return res.status(400).json({error:'Enter a Galerie Paris–Lisboa product URL, a Vinted (Portugal or Italy), Etsy or APOC Store listing URL, or an Instagram post URL.'});
  try{
   if(image&&url.hostname==='images.squarespace-cdn.com')url.searchParams.set('format','1500w');
   const result=await retrieve(url,hosts,image?4*1024*1024:3*1024*1024,image?'image/jpeg,image/png,image/webp':'text/html,application/xhtml+xml');

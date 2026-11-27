@@ -22,6 +22,9 @@
       if(url.protocol!=='https:'||url.username||url.password||url.port)return null;
       if(host==='etsy.com'&&/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?listing\/\d+(?:\/[^/]+)?\/?$/i.test(url.pathname))
         return {platform:'etsy',label:'View on Etsy',url:url.href};
+      const variant=url.searchParams.get('variant');
+      if(host==='apoc-store.com'&&/^\/products\/[a-z0-9-]+\/?$/i.test(url.pathname)&&(variant===null||/^\d+$/.test(variant)))
+        return {platform:'apoc',label:'View on APOC Store',url:url.href};
       const market=Object.keys(vintedMarkets).find(key=>vintedMarkets[key].host===host);
       if(market&&/^\/items\/\d+(?:-[^/]+)?\/?$/.test(url.pathname))
         return {platform:market,label:'View on Vinted',url:url.href};
@@ -38,10 +41,12 @@
       return 'Use a '+market.name+' link ('+market.host+') or change Marketplace.';
     if(!profile&&marketplaceListing(value)?.platform===platform)return '';
     if(profile&&url.protocol==='https:'&&!url.username&&!url.password&&!url.port){
+      if(platform==='apoc'&&host==='apoc-store.com'&&/^\/(?:collections\/[a-z0-9-]+\/?)?$/i.test(url.pathname))return '';
       const etsyShop=host==='etsy.com'&&/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?shop\/[a-z0-9]+\/?$/i.test(url.pathname);
       const vintedMember=host===market?.host&&/^\/member\/\d+(?:-[^/]+)?\/?$/.test(url.pathname);
       if(platform==='etsy'?etsyShop:vintedMember)return '';
     }
+    if(platform==='apoc')return profile?'Enter an APOC Store designer collection URL (/collections/…).':'Enter an APOC Store product URL (/products/…).';
     if(platform==='etsy')return profile?'Enter an Etsy shop URL (/shop/…).':'Enter an Etsy listing URL (/listing/…).';
     return profile?'Enter a '+market.name+' seller profile URL (/member/…).':'Enter a '+market.name+' item URL (/items/…).';
   }
@@ -480,6 +485,7 @@
         platform.name='platform';
         platform.add(new Option('Manual entry',''));
         platform.add(new Option('Etsy','etsy'));
+        platform.add(new Option('APOC Store','apoc'));
         for(const [key,market] of Object.entries(vintedMarkets))platform.add(new Option(market.name,key));
         sourceLabel.append(platform);
         form.append(sourceLabel,sourceFields);
@@ -520,6 +526,11 @@
           }
           const market=vintedMarkets[platform.value];
           source.placeholder=market?'https://www.'+market.host+'/items/…':'https://www.etsy.com/listing/…';
+          if(platform.value==='apoc'){
+            source.placeholder='https://apoc-store.com/products/…';
+            seller.placeholder='https://apoc-store.com/collections/…';
+            return;
+          }
           seller.placeholder=market?'https://www.'+market.host+'/member/…':'https://www.etsy.com/shop/…';
         };
         platform.onchange=()=>{
