@@ -170,7 +170,9 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   const code=emails[1].text.match(/\b\d{6}\b/)[0];
   const claimed=await call('/api/auth/code/verify',null,'POST',{email:profile.email,code,invite});
   assert.equal(claimed.status,200,await claimed.clone().text());
-  const owner=(await claimed.json()).token;
+  const sessionResult=await claimed.json();
+  assert.equal(sessionResult.expires_in,604800);
+  const owner=sessionResult.token;
   assert.equal((await call('/api/auth/code/verify',null,'POST',{email:profile.email,code,invite})).status,400);
   assert.equal((await preview(previewToken)).status,404);
   const publishedAfter=(await feed()).listings.find(row=>row.id===publicId);

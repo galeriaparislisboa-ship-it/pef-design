@@ -822,7 +822,7 @@ transform:none!important;
 .pef-like-button svg{fill:none}.pef-like-button[aria-pressed="true"] svg{fill:currentColor}
 .pef-like-button small{font-size:10px;line-height:1;color:inherit;font-variant-numeric:tabular-nums}
 .side .pef-like-button{gap:2px;padding:3px 6px}
-</style><link rel="stylesheet" href="/moderation-ui.css?v=5"><link rel="stylesheet" href="/partner-pages.css?v=3"><script src="/partner-pages.js?v=5"></script><script src="/moderation-ui.js?v=8"></script><style>.pef-newsletter{width:min(96vw,1060px);max-height:90dvh;box-sizing:border-box;border:1px solid #ccc;border-radius:20px;background:#f5f5f5;color:#222;padding:20px;font:14px/1.4 system-ui;overflow:auto}
+</style><link rel="stylesheet" href="/moderation-ui.css?v=5"><link rel="stylesheet" href="/partner-pages.css?v=3"><script src="/partner-pages.js?v=6"></script><script src="/moderation-ui.js?v=8"></script><style>.pef-newsletter{width:min(96vw,1060px);max-height:90dvh;box-sizing:border-box;border:1px solid #ccc;border-radius:20px;background:#f5f5f5;color:#222;padding:20px;font:14px/1.4 system-ui;overflow:auto}
 .pef-newsletter::backdrop{background:#000b}
 .pef-newsletter header,.pef-newsletter-preview,.pef-newsletter-actions,.pef-newsletter-piece{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pef-newsletter header{margin-bottom:12px}
@@ -1100,8 +1100,8 @@ function pefUseLikeSession(token){
  pendingLikes.clear();
 }
 function pefIsLiked(id){
- if(likeSyncToken&&sessionStorage.getItem('pefCloudflareSession')===likeSyncToken&&pendingLikes.has(id))return pendingLikes.get(id);
- return guestFavorites.has(id)||(likeSyncToken===sessionStorage.getItem('pefCloudflareSession')&&accountFavorites.has(id));
+ if(likeSyncToken&&window.pefPartners.session.get()===likeSyncToken&&pendingLikes.has(id))return pendingLikes.get(id);
+ return guestFavorites.has(id)||(likeSyncToken===window.pefPartners.session.get()&&accountFavorites.has(id));
 }
 function pefLikeButton(item){
  const id=String(item.id);
@@ -1124,11 +1124,11 @@ function pefApplyLikes(result){
  pefRefreshLikeButtons();
 }
 async function pefSyncLikes(){
- const token=sessionStorage.getItem('pefCloudflareSession');
+ const token=window.pefPartners.session.get();
  if(!token||likesSyncing)return;
  likesSyncing=true;
  const headers={Authorization:'Bearer '+token,'Content-Type':'application/json'};
- const isCurrent=()=>sessionStorage.getItem('pefCloudflareSession')===token;
+ const isCurrent=()=>window.pefPartners.session.get()===token;
  async function request(method,changes){
   const response=await fetch(pefLikesApi,{method,headers,body:changes&&JSON.stringify({changes}),cache:'no-store'});
   if(!response.ok)throw Error('Like sync failed ('+response.status+')');
@@ -1160,14 +1160,14 @@ async function pefSyncLikes(){
   console.warn(error.message);
  }finally{
   likesSyncing=false;
-  if(sessionStorage.getItem('pefCloudflareSession')!==token)void pefSyncLikes();
+  if(window.pefPartners.session.get()!==token)void pefSyncLikes();
  }
 }
 function pefToggleLike(id){
  const item=items.find(row=>String(row.id)===id);
  if(!item)return;
  const liked=!pefIsLiked(id);
- const token=sessionStorage.getItem('pefCloudflareSession');
+ const token=window.pefPartners.session.get();
  if(token&&item.remote){
   pefUseLikeSession(token);
   pendingLikes.set(id,liked);
@@ -1926,7 +1926,7 @@ async function publish(){
  const phoneError=!/^\+?[0-9\s().-]{7,20}$/.test(whatsapp)?'Enter a valid international WhatsApp number.':'';
  const validation=photoError||detailsError||priceError||phoneError;
  if(validation){alert(validation);return}
- const token=sessionStorage.getItem('pefCloudflareSession');
+ const token=window.pefPartners.session.get();
  if(!token){savePendingDraft();alert('Draft saved. Sign in under Profile, then return to Post.');show('profile');return}
  const button=document.querySelector('#create button.primary');
  if(button.disabled)return;
@@ -1940,7 +1940,7 @@ async function publish(){
   const response=await fetch(api+path,{method:'POST',headers:{...headers,'Content-Type':type},body});
   const data=await response.json().catch(()=>null);
   if(response.status===401){
-   sessionStorage.removeItem('pefCloudflareSession');
+   window.pefPartners.session.clear();
    const error=Error('Session expired. Your draft is saved. Sign in again to publish.');
    error.expired=true;throw error;
   }
@@ -2309,13 +2309,18 @@ async function editGallerySettings(host,headers){
  syncProfile();
  form.append(save,remove,feedback);host.append(form);
 }
-async function openCloudflareProfile(token){
+async function openCloudflareProfile(token,navigate=true){
  const api=window.pefPartners.api;
  const headers={Authorization:'Bearer '+token};
  const response=await fetch(api+'/api/auth/me',{headers});
- if(!response.ok)throw Error('Your session expired. Request a new code.');
+ if(response.status===401||response.status===403){
+  if(window.pefPartners.session.get()===token)window.pefPartners.session.clear();
+  throw Error('Your session expired. Request a new code.');
+ }
+ if(!response.ok)throw Error('Could not check your session. Try again.');
+ if(!navigate&&window.pefPartners.session.get()!==token)return;
  const account=await response.json();
- sessionStorage.setItem('pefCloudflareSession',token);
+ window.pefPartners.session.set(token);
  void pefSyncLikes();
  const host=document.getElementById('profile');
  let panel=document.getElementById('pefCloudflareProfile');
@@ -2328,7 +2333,7 @@ async function openCloudflareProfile(token){
  title.textContent=account.role==='gallery'?'Galerie Paris–Lisboa':account.role==='admin'?'PEF Administration':'My listings';
  const email=document.createElement('p');email.textContent=account.email;
  const logout=document.createElement('button');logout.textContent='Sign out';
- logout.onclick=()=>{sessionStorage.removeItem('pefCloudflareSession');location.reload()};
+ logout.onclick=()=>{window.pefPartners.session.clear();location.reload()};
  const header=document.createElement('header');header.append(title,email,logout);
  const list=document.createElement('div');list.className='cf-listing-list';
  const brand=document.createElement('img');
@@ -2362,7 +2367,7 @@ async function openCloudflareProfile(token){
  }
  const auth=document.getElementById('authStatus').parentElement;
  auth.hidden=true;auth.style.display='none';
- show('profile');
+ if(navigate)show('profile');
  const legacyAdmin=document.getElementById('pefAdminPanel');
  if(legacyAdmin)legacyAdmin.style.display='none';
  panel.classList.toggle('cf-admin-profile',account.role==='admin');
@@ -2383,14 +2388,14 @@ async function openCloudflareProfile(token){
  const note=document.createElement('p');note.setAttribute('role','status');panel.append(note);
  let refreshing=false;
  async function refreshListings(){
- if(refreshing||sessionStorage.getItem('pefCloudflareSession')!==token)return;
+ if(refreshing||window.pefPartners.session.get()!==token)return;
  refreshing=true;
  refreshButton.disabled=true;
  note.textContent='Refreshing listings…';
  try{
   let feed=await fetch(api+'/api/listings/mine',{headers,cache:'no-store'});
   if(feed.status===501)feed=await fetch(api+'/api/text-listings',{cache:'no-store'});
-  if(!list.isConnected||sessionStorage.getItem('pefCloudflareSession')!==token)return;
+  if(!list.isConnected||window.pefPartners.session.get()!==token)return;
   if(!feed.ok)throw Error('Could not load listings.');
   const {listings}=await feed.json();
   if(account.role==='gallery'){
@@ -2755,7 +2760,7 @@ async function pefGalleryRefresh(){
 }
 let pefReportTarget=null;
 function pefCloseReport(){document.getElementById('pefReportOverlay')?.remove();pefReportTarget=null}
-async function pefReportListing(index){const x=items[index];if(!x?.remote||!x.id){pefNotice('error','This listing cannot be reported.');return}const token=sessionStorage.getItem('pefCloudflareSession');if(!token){pefNotice('info','Sign in under Profile to report a listing.');show('profile');return}pefCloseReport();pefReportTarget=x.id;const overlay=document.createElement('div');overlay.id='pefReportOverlay';overlay.className='pef-report-overlay';overlay.innerHTML='<form class="pef-report-dialog"><button type="button" class="pef-report-close" aria-label="Close">×</button><div class="pef-report-mark">⚑</div><h2>Report this listing</h2><p class="pef-report-sub">Why are you reporting this item?</p><div class="pef-report-options"><label><input type="radio" name="pefReason" value="Inappropriate content" required><span>Inappropriate content</span></label><label><input type="radio" name="pefReason" value="Misleading listing"><span>Misleading listing</span></label><label><input type="radio" name="pefReason" value="Spam"><span>Spam</span></label><label><input type="radio" name="pefReason" value="Other"><span>Other</span></label></div><label class="pef-report-details-label" for="pefReportDetails">Additional details <small>(optional)</small></label><textarea id="pefReportDetails" maxlength="500" placeholder="Tell us more…" rows="3"></textarea><button class="pef-report-submit" type="submit">Submit report</button><button class="pef-report-cancel" type="button">Cancel</button></form>';document.body.append(overlay);overlay.querySelector('.pef-report-close').onclick=pefCloseReport;overlay.querySelector('.pef-report-cancel').onclick=pefCloseReport;overlay.addEventListener('click',e=>{if(e.target===overlay)pefCloseReport()});overlay.querySelector('form').onsubmit=async e=>{e.preventDefault();const reason=overlay.querySelector('input[name="pefReason"]:checked')?.value;if(!reason)return;const button=overlay.querySelector('.pef-report-submit');button.disabled=true;button.textContent='Sending…';const details=overlay.querySelector('#pefReportDetails').value;try{await window.pefModeration.report(token,pefReportTarget,reason,details)}catch(error){button.disabled=false;button.textContent='Submit report';pefNotice('error',error.message);return}pefCloseReport();pefNotice('success','Report received. Thank you. We will review this listing.')};overlay.querySelector('input[name="pefReason"]')?.focus()}
+async function pefReportListing(index){const x=items[index];if(!x?.remote||!x.id){pefNotice('error','This listing cannot be reported.');return}const token=window.pefPartners.session.get();if(!token){pefNotice('info','Sign in under Profile to report a listing.');show('profile');return}pefCloseReport();pefReportTarget=x.id;const overlay=document.createElement('div');overlay.id='pefReportOverlay';overlay.className='pef-report-overlay';overlay.innerHTML='<form class="pef-report-dialog"><button type="button" class="pef-report-close" aria-label="Close">×</button><div class="pef-report-mark">⚑</div><h2>Report this listing</h2><p class="pef-report-sub">Why are you reporting this item?</p><div class="pef-report-options"><label><input type="radio" name="pefReason" value="Inappropriate content" required><span>Inappropriate content</span></label><label><input type="radio" name="pefReason" value="Misleading listing"><span>Misleading listing</span></label><label><input type="radio" name="pefReason" value="Spam"><span>Spam</span></label><label><input type="radio" name="pefReason" value="Other"><span>Other</span></label></div><label class="pef-report-details-label" for="pefReportDetails">Additional details <small>(optional)</small></label><textarea id="pefReportDetails" maxlength="500" placeholder="Tell us more…" rows="3"></textarea><button class="pef-report-submit" type="submit">Submit report</button><button class="pef-report-cancel" type="button">Cancel</button></form>';document.body.append(overlay);overlay.querySelector('.pef-report-close').onclick=pefCloseReport;overlay.querySelector('.pef-report-cancel').onclick=pefCloseReport;overlay.addEventListener('click',e=>{if(e.target===overlay)pefCloseReport()});overlay.querySelector('form').onsubmit=async e=>{e.preventDefault();const reason=overlay.querySelector('input[name="pefReason"]:checked')?.value;if(!reason)return;const button=overlay.querySelector('.pef-report-submit');button.disabled=true;button.textContent='Sending…';const details=overlay.querySelector('#pefReportDetails').value;try{await window.pefModeration.report(token,pefReportTarget,reason,details)}catch(error){button.disabled=false;button.textContent='Submit report';pefNotice('error',error.message);return}pefCloseReport();pefNotice('success','Report received. Thank you. We will review this listing.')};overlay.querySelector('input[name="pefReason"]')?.focus()}
 async function pefAdminLoadReports(){const box=document.getElementById('pefAdminReports');if(!box)return;const {data,error}=await sb.rpc('pef_admin_reports');if(error){box.textContent='Reports unavailable: '+error.message;return}box.replaceChildren();const title=document.createElement('h3');title.textContent='Reports ('+data.length+')';box.append(title);for(const r of data){const line=document.createElement('p');line.style.cssText='padding:8px;border-top:1px solid #444;overflow-wrap:anywhere';line.textContent=r.title+' — '+r.reason+(r.details?' — '+r.details:'')+' · '+new Date(r.created_at).toLocaleString();box.append(line)}}
 
 /* Seller verification request, manual administrator review and decision. */
@@ -3832,13 +3837,18 @@ if(new URL(location.href).searchParams.get('story')==='preview'){
  }).catch(()=>alert('Could not load the gallery Content preview.'));
 }
 </script><script>
-if(new URLSearchParams(location.search).get('sellerOnboarded')==='1'){
- const token=sessionStorage.getItem('pefCloudflareSession');
- if(token)openCloudflareProfile(token).then(()=>{
-  const url=new URL(location.href);
+{
+ const url=new URL(location.href);
+ const onboarded=url.searchParams.get('sellerOnboarded')==='1';
+ const token=window.pefPartners.session.get();
+ if(token)openCloudflareProfile(token,onboarded).then(()=>{
+  if(!onboarded)return;
   url.searchParams.delete('sellerOnboarded');
   history.replaceState(null,'',url);
- }).catch(()=>show('profile'));
+ }).catch(()=>{if(onboarded)show('profile')});
+ window.addEventListener('storage',event=>{
+  if(event.key==='pefCloudflareSession'&&!event.newValue)location.reload();
+ });
 }
 </script>
 </body></html>

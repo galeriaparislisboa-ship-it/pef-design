@@ -3,6 +3,12 @@
   const api = location.origin===production
     ? 'https://pef-design-api.galeriaparislisboa.workers.dev'
     : 'https://pef-design-api-staging.galeriaparislisboa.workers.dev';
+  const sessionKey='pefCloudflareSession';
+  const session={
+    get(){return localStorage.getItem(sessionKey)||sessionStorage.getItem(sessionKey)},
+    set(token){localStorage.setItem(sessionKey,token);sessionStorage.removeItem(sessionKey)},
+    clear(){localStorage.removeItem(sessionKey);sessionStorage.removeItem(sessionKey)},
+  };
   const section = '/api/admin/partner-pages';
   const ownerSection = '/api/partners/pages';
 
@@ -415,7 +421,7 @@
     code.inputMode='numeric';code.pattern='[0-9]{6}';code.autocomplete='one-time-code';
     otp.hidden=true;
     function complete(token){
-      sessionStorage.setItem('pefCloudflareSession',token);
+      session.set(token);
       location.replace('/?sellerOnboarded=1');
     }
     submit(form,'Send sign-in code',feedback,async()=>{
@@ -447,7 +453,7 @@
     }catch(error){feedback.textContent=error.message}
   }
 
-  window.pefPartners={mount,api};
+  window.pefPartners={mount,api,session};
   const onboardingHost=document.getElementById('pef-partner-onboarding');
   if(onboardingHost)void onboarding(onboardingHost);
 })();

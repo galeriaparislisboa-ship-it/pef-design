@@ -8,6 +8,7 @@ import {issueCode,consumeCode} from "./auth-email-code.mjs";
 // Bind DB (D1) and MEDIA (R2). No anonymous admin access.
 const ORIGINS = new Set(['https://pef-design.vercel.app','https://pef-design-bs4xn2zv3-pef-design.vercel.app','https://pef-design-git-feature-cloudflare-auth-no-sup-8503c8-pef-design.vercel.app','https://pef-design-6y7bxstu7-pef-design.vercel.app']);
 const enc = new TextEncoder();
+const signInLifetime = 7 * 24 * 60 * 60;
 function base64url(bytes){return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
 function unbase64url(s){const b=atob(s.replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0));}
 async function sign(secret,data){const k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return base64url(new Uint8Array(await crypto.subtle.sign('HMAC',k,enc.encode(data))));}
@@ -53,7 +54,7 @@ export default {
   }
   if(path==='/health'&&method==='GET')return out({service:'pef-design-api',status:'ok'});
   async function createSession(email,role,userId){
-   const payload=base64url(enc.encode(JSON.stringify({role,email,userId,exp:Date.now()+1800000})));
+   const payload=base64url(enc.encode(JSON.stringify({role,email,userId,exp:Date.now()+signInLifetime*1000})));
    return payload+'.'+await sign(env.SESSION_SECRET,payload);
   }
   if(path==='/auth/google/start'||path==='/auth/google/callback'){
@@ -79,7 +80,7 @@ export default {
     if((!account&&!invitation)||!await consumeCode(env.DB,'pef-otp:'+env.SESSION_SECRET+invite,email,body?.code))return out({error:'Invalid or expired code'},401);
     if(invitation)account=await claimPartnerPage(env.DB,invite,email);
     if(!account)return out({error:'The page was already claimed or the invitation expired'},409);
-    return out({token:await createSession(email,role,account.id),role,email,expires_in:1800});
+    return out({token:await createSession(email,role,account.id),role,email,expires_in:signInLifetime});
    }catch{return out({error:'Sign-in temporarily unavailable'},503)}
   }
   if(path==='/api/auth/login'&&method==='POST'){
