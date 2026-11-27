@@ -164,6 +164,10 @@ test('Cloudflare moderation preserves data and enforces visibility and roles', a
   assert.equal(before.seller_name,profile.name);
   assert.equal(before.seller_id,pageId);
   assert.equal(before.seller_profile_hidden,1);
+  assert.equal(before.seller_logo_page,pageId);
+  const feedLogo=await call('/api/partners/feed-logo/'+pageId);
+  assert.equal(feedLogo.status,200);
+  assert.equal(feedLogo.headers.get('Content-Type'),'image/png');
   assert.equal((await feed()).listings.some(row=>row.id===privateId),false);
   assert.equal((await worker.fetch(new Request(media),env)).status,200);
   db.prepare('UPDATE pef_objects SET likes=4,views=23 WHERE id=?').run(publicId);

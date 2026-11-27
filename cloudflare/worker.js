@@ -185,7 +185,9 @@ export default {
        (SELECT display_name FROM pef_seller_badges WHERE seller_id=pef_objects.seller_id AND badge<>'none')) AS seller_name,
      (SELECT CASE WHEN p.owner_id IS NULL OR COALESCE(s.public,0)=0 THEN 1 ELSE 0 END
        FROM pef_partner_listings l JOIN pef_partner_pages p ON p.id=l.page_id
-       LEFT JOIN pef_partner_presentation s ON s.page_id=p.id WHERE l.id=pef_objects.id) AS seller_profile_hidden
+       LEFT JOIN pef_partner_presentation s ON s.page_id=p.id WHERE l.id=pef_objects.id) AS seller_profile_hidden,
+     (SELECT l.page_id FROM pef_partner_listings l JOIN pef_partner_presentation p ON p.page_id=l.page_id
+       WHERE l.id=pef_objects.id AND p.logo IS NOT NULL) AS seller_logo_page
      FROM pef_objects WHERE ${visibleListing} ORDER BY created_at DESC LIMIT 100`).all();
     const listings=result.results.map(listingWithMedia);
     return out({listings,count:listings.length});

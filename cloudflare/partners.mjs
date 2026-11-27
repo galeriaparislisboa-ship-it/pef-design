@@ -145,6 +145,16 @@ export async function partners(request,env,user,out) {
   if (!db) return out({error:'Database unavailable'},503);
   try {
     await initializeModeration(db);
+    if (path.startsWith('/api/partners/feed-logo/') && method==='GET') {
+      const page=path.split('/').at(-1);
+      if(!idPattern.test(page))return out({error:'Logo unavailable'},404);
+      const row=await query(db,`SELECT s.logo FROM pef_partner_presentation s WHERE s.page_id=? AND s.logo IS NOT NULL
+        AND EXISTS(SELECT 1 FROM pef_partner_listings l JOIN pef_objects ON pef_objects.id=l.id
+          WHERE l.page_id=s.page_id AND l.published_at IS NOT NULL AND ${visibleListing})`,page).first();
+      if(!row)return out({error:'Logo unavailable'},404);
+      const png=Uint8Array.from(atob(row.logo.slice('data:image/png;base64,'.length)),character=>character.charCodeAt(0));
+      return new Response(png,{headers:{'Content-Type':'image/png','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
+    }
     if (path.startsWith('/api/partners/public-profile/') && method==='GET') {
       const owner=path.split('/').at(-1);
       if(!idPattern.test(owner))return out({error:'Seller page unavailable'},404);
