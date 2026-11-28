@@ -175,29 +175,15 @@
       catch{account.parentElement.hidden=true}
     };
     let photos=[];
-    const selected=element('ol');
-    selected.className='pef-partner-selection';
-    const draw=()=>{
-      selected.replaceChildren(...photos.map((file,index)=>{
-        const row=element('li');
-        const image=element('img');
-        image.alt=file.name;
-        const url=URL.createObjectURL(file);
-        image.onload=image.onerror=()=>URL.revokeObjectURL(url);
-        image.src=url;
-        const controls=element('div');
-        const action=(symbol,label,handler)=>{
-          const control=button(symbol,handler);
-          control.setAttribute('aria-label',label);
-          control.title=label;
-          return control;
-        };
-        if(index>0)controls.append(action('↑','Move photo '+(index+1)+' earlier',()=>{[photos[index-1],photos[index]]=[photos[index],photos[index-1]];draw()}));
-        controls.append(action('×','Remove photo '+(index+1),()=>{photos.splice(index,1);draw()}));
-        row.append(image,element('small',index===0?'Cover':String(index+1)),controls);
-        return row;
-      }));
-    };
+    const selected=photoSelection(()=>photos,file=>{
+      const image=element('img');
+      image.alt=file.name;
+      const url=URL.createObjectURL(file);
+      image.onload=image.onerror=()=>URL.revokeObjectURL(url);
+      image.src=url;
+      return image;
+    });
+    const draw=selected.draw;
     const flash=button('Flash import',control=>run(control,importFeedback,async()=>{
       if(!source.value||!source.checkValidity())throw Error('Enter a valid listing URL.');
       const product=initial.product&&initial.url===source.value
@@ -229,7 +215,7 @@
       pick.value='';
     };
     const photoLabel=element('label','Photos (2 to 5)');
-    photoLabel.append(pick);form.append(photoLabel,selected);
+    photoLabel.append(pick);form.append(photoLabel,selected.grid);
     submit(form,'Save draft',feedback,async()=>{
       if(photos.length<2||photos.length>5)throw Error('Select 2 to 5 photos.');
       const data=new FormData(form);
@@ -242,27 +228,120 @@
     if(initial.product)flash.click();
     return form;
   }
+  function photoSelection(getPhotos,preview,onChange=()=>{},min=0) {
+    const grid=element('ol');
+    grid.className='pef-partner-selection';
+    function move(from,to) {
+      if(from===to)return;
+      const photos=getPhotos();
+      photos.splice(to,0,...photos.splice(from,1));
+      draw();
+      onChange();
+    }
+    function draw() {
+      const photos=getPhotos();
+      grid.replaceChildren(...photos.map((photo,index)=>{
+        const row=element('li');
+        row.dataset.photoIndex=index;
+        const grip=element('div');
+        grip.className='pef-partner-photo-grip';
+        const image=preview(photo);
+        image.draggable=false;
+        grip.append(image);
+        let pointer=null;
+        grip.onpointerdown=event=>{
+          if(!event.isPrimary||event.button!==0)return;
+          pointer=event.pointerId;
+          grip.setPointerCapture(pointer);
+          row.classList.add('pef-partner-photo-dragging');
+        };
+        grip.onpointerup=event=>{
+          if(pointer!==event.pointerId)return;
+          const target=document.elementFromPoint(event.clientX,event.clientY)?.closest('[data-photo-index]');
+          if(target?.parentElement===grid)move(index,Number(target.dataset.photoIndex));
+        };
+        grip.onlostpointercapture=()=>{
+          pointer=null;
+          row.classList.remove('pef-partner-photo-dragging');
+        };
+        const controls=element('div');
+        controls.className='pef-partner-photo-actions';
+        const action=(symbol,label,handler)=>{
+          const control=button(symbol,handler);
+          control.setAttribute('aria-label',label+' photo '+(index+1));
+          return control;
+        };
+        if(index>0)controls.append(action('←','Move earlier',()=>move(index,index-1)));
+        if(index<photos.length-1)controls.append(action('→','Move later',()=>move(index,index+1)));
+        const remove=action('×','Remove',()=>{
+          if(photos.length<=min)return;
+          photos.splice(index,1);
+          draw();
+          onChange();
+        });
+        remove.disabled=photos.length<=min;
+        controls.append(remove);
+        row.append(grip,element('small',index===0?'Cover':String(index+1)),controls);
+        return row;
+      }));
+    }
+    return {grid,draw};
+  }
+  function photoPreview(url,headers) {
+    const image=element('img');
+    image.alt='';image.loading='lazy';image.hidden=true;
+    fetch(url,{headers:url.startsWith(api+'/media/')?headers:{},referrerPolicy:'no-referrer'}).then(async response=>{
+      if(!response.ok)return;
+      const source=URL.createObjectURL(await response.blob());
+      image.onload=image.onerror=()=>URL.revokeObjectURL(source);
+      image.src=source;image.hidden=false;
+    }).catch(()=>{});
+    return image;
+  }
   function showPhotos(container,photos,headers) {
     const grid=element('div');
     grid.className='pef-partner-photos';
+    grid.append(...photos.map(url=>photoPreview(url,headers)));
     container.append(grid);
-    for(const url of photos){
-      const image=element('img');
-      image.alt='';image.loading='lazy';image.hidden=true;
-      grid.append(image);
-      fetch(url,{headers:url.startsWith(api+'/media/')?headers:{},referrerPolicy:'no-referrer'}).then(async response=>{
-        if(!response.ok)return;
-        const source=URL.createObjectURL(await response.blob());
-        image.onload=image.onerror=()=>URL.revokeObjectURL(source);
-        image.src=source;image.hidden=false;
-      }).catch(()=>{});
-    }
   }
-  function showListings(container,listings,headers,path,admin,refresh) {
+  function editListingPhotos(card,listing,headers) {
+    const photos=[...listing.photos];
+    const previews=new Map();
+    const feedback=status();
+    let saved=JSON.stringify(photos);
+    const changed=()=>saved!==JSON.stringify(photos);
+    const {grid,draw}=photoSelection(()=>photos,url=>{
+      if(!previews.has(url))previews.set(url,photoPreview(url,headers));
+      return previews.get(url);
+    },()=>{save.disabled=!changed();feedback.textContent=''},2);
+    const save=button('Save photos',control=>run(control,feedback,async()=>{
+      if(listing.video_url===undefined)throw Error('Photo editing is temporarily unavailable.');
+      const submitted=[...photos];
+      grid.inert=true;
+      try {
+        await request('/api/listings/'+encodeURIComponent(listing.id)+'/media',headers,'PATCH',
+          {photos:submitted,video_url:listing.video_url});
+        listing.photos=submitted;
+        saved=JSON.stringify(submitted);
+        if(listing.published_at)void window.loadRemote?.();
+        return 'Photos saved.';
+      } finally {
+        grid.inert=false;
+      }
+    }));
+    const details=element('details');
+    details.append(element('summary','Edit photos'),element('p','Drag photos to reorder. Keep at least 2 photos.'),grid,save,feedback);
+    card.append(details);
+    draw();
+    save.disabled=true;
+    return changed;
+  }
+  function showListings(container,listings,headers,path,admin,refresh,canEditPhotos=false) {
     for(const listing of listings){
       const card=element('article');
       card.append(element('h4',listing.title),element('p',[listing.price&&listing.price+' €',listing.is_hidden?'Private':'In the feed'].filter(Boolean).join(' · ')));
-      showPhotos(card,listing.photos,headers);
+      const photosChanged=canEditPhotos?editListingPhotos(card,listing,headers):null;
+      if(!canEditPhotos)showPhotos(card,listing.photos,headers);
       if(!path&&listing.description)card.append(element('p',listing.description));
       if(path){
         const form=element('form'), feedback=status();
@@ -315,6 +394,7 @@
               form.querySelector('[type=submit]').focus();
               throw Error('Click Save details before publishing your changes.');
             }
+            if(photosChanged?.())throw Error('Click Save photos before publishing your changes.');
             if(listing.photos.length<2)throw Error('At least two photos are required to publish.');
             await request(path+'/publish/'+encodeURIComponent(listing.id),headers,'POST',values(publish));
             await refresh();
@@ -613,7 +693,7 @@
         details.append(element('summary','Edit seller page'),form);
         body.append(details);
       }
-      showListings(body,listings,headers,path,admin,()=>open(id));
+      showListings(body,listings,headers,path,admin,()=>open(id),!admin||!page.owner_id);
       if(!listings.length)body.append(element('p','No listings yet.'));
     }
     if(admin){
