@@ -248,20 +248,34 @@
         const image=preview(photo);
         image.draggable=false;
         grip.append(image);
-        let pointer=null;
+        let pointer=null,startX,startY;
+        grip.tabIndex=0;
+        grip.setAttribute('aria-label','Photo '+(index+1)+'. Use arrow keys to reorder.');
+        grip.onkeydown=e=>{
+          const delta={ArrowLeft:-1,ArrowRight:1}[e.key];
+          if(!delta)return;
+          e.preventDefault();
+          const to=Math.max(0,Math.min(photos.length-1,index+delta));
+          move(index,to);
+          grid.children[to].firstElementChild.focus();
+        };
         grip.onpointerdown=event=>{
           if(!event.isPrimary||event.button!==0)return;
-          pointer=event.pointerId;
+          pointer=event.pointerId;startX=event.clientX;startY=event.clientY;
           grip.setPointerCapture(pointer);
           row.classList.add('pef-partner-photo-dragging');
         };
+        grip.onpointermove=event=>{
+          if(pointer===event.pointerId)grip.style.transform='translate('+(event.clientX-startX)+'px,'+(event.clientY-startY)+'px)';
+        };
         grip.onpointerup=event=>{
           if(pointer!==event.pointerId)return;
+          grip.style.transform='';
           const target=document.elementFromPoint(event.clientX,event.clientY)?.closest('[data-photo-index]');
           if(target?.parentElement===grid)move(index,Number(target.dataset.photoIndex));
         };
         grip.onlostpointercapture=()=>{
-          pointer=null;
+          grip.style.transform='';pointer=null;
           row.classList.remove('pef-partner-photo-dragging');
         };
         const controls=element('div');
@@ -271,8 +285,6 @@
           control.setAttribute('aria-label',label+' photo '+(index+1));
           return control;
         };
-        if(index>0)controls.append(action('←','Move earlier',()=>move(index,index-1)));
-        if(index<photos.length-1)controls.append(action('→','Move later',()=>move(index,index+1)));
         const remove=action('×','Remove',()=>{
           if(photos.length<=min)return;
           photos.splice(index,1);
@@ -309,28 +321,74 @@
     const previews=new Map();
     const feedback=status();
     let saved=JSON.stringify(photos);
-    const changed=()=>saved!==JSON.stringify(photos);
+    let video=listing.video_url||'';
+    const changed=()=>saved!==JSON.stringify(photos)||video!==(listing.video_url||'');
+    const endpoint='/api/listings/'+encodeURIComponent(listing.id);
+    const editor=element('div');
+    async function upload(blob){
+      const res=await fetch(api+endpoint+'/upload',{method:'POST',headers:{...headers,'Content-Type':blob.type},body:blob});
+      const result=await res.json();
+      if(!res.ok||!result.url)throw Error(result.error||'Upload failed.');
+      return result.url;
+    }
+    function picker(label,accept,multiple,work){
+      const input=element('input');
+      input.type='file';input.accept=accept;input.multiple=multiple;input.hidden=true;
+      const choose=button(label,()=>input.click());
+      input.onchange=async()=>{
+        const files=Array.from(input.files);input.value='';
+        if(!files.length)return;
+        editor.inert=true;
+        try{await run(choose,feedback,()=>work(files))}
+        finally{editor.inert=false;save.disabled=!changed()}
+      };
+      editor.append(input,choose);
+      return choose;
+    }
     const {grid,draw}=photoSelection(()=>photos,url=>{
       if(!previews.has(url))previews.set(url,photoPreview(url,headers));
       return previews.get(url);
     },()=>{save.disabled=!changed();feedback.textContent=''},2);
-    const save=button('Save photos',control=>run(control,feedback,async()=>{
+    const save=button('Save media',control=>run(control,feedback,async()=>{
       if(listing.video_url===undefined)throw Error('Photo editing is temporarily unavailable.');
       const submitted=[...photos];
-      grid.inert=true;
+      editor.inert=true;
       try {
         await request('/api/listings/'+encodeURIComponent(listing.id)+'/media',headers,'PATCH',
-          {photos:submitted,video_url:listing.video_url});
-        listing.photos=submitted;
+          {photos:submitted,video_url:video});
+        listing.photos=submitted;listing.video_url=video;
         saved=JSON.stringify(submitted);
         if(listing.published_at)void window.loadRemote?.();
-        return 'Photos saved.';
+        return 'Media saved.';
       } finally {
-        grid.inert=false;
+        editor.inert=false;
       }
     }));
     const details=element('details');
-    details.append(element('summary','Edit photos'),element('p','Drag photos to reorder. Keep at least 2 photos.'),grid,save,feedback);
+    editor.append(grid);
+    picker('Add photos','image/*',true,async files=>{
+      if(files.length+photos.length>5)throw Error('Choose up to 5 photos in total.');
+      for(const file of files){
+        photos.push(await upload(await compress(file)));
+        draw();
+      }
+      return 'Photos added. Tap Save media.';
+    });
+    const videoButton=picker(video?'Replace video':'Add video','video/*,.mov,.mp4',false,async ([file])=>{
+      const blob=await convertForPEF(file,0,message=>{feedback.textContent=message});
+      if(!blob||blob.size>5*1024*1024)throw Error('Video exceeds 5 MB after compression.');
+      video=await upload(blob);
+      updateVideo();
+      return 'Video ready. Tap Save media.';
+    });
+    const removeVideo=button('Remove video',()=>{video='';updateVideo();save.disabled=!changed()});
+    function updateVideo(){
+      videoButton.textContent=video?'Replace video':'Add video';
+      removeVideo.hidden=!video;
+    }
+    editor.append(removeVideo,save);
+    updateVideo();
+    details.append(element('summary','Edit media'),element('p','Drag to reorder · 2–5 photos'),editor,feedback);
     card.append(details);
     draw();
     save.disabled=true;
@@ -394,7 +452,7 @@
               form.querySelector('[type=submit]').focus();
               throw Error('Click Save details before publishing your changes.');
             }
-            if(photosChanged?.())throw Error('Click Save photos before publishing your changes.');
+            if(photosChanged?.())throw Error('Click Save media before publishing your changes.');
             if(listing.photos.length<2)throw Error('At least two photos are required to publish.');
             await request(path+'/publish/'+encodeURIComponent(listing.id),headers,'POST',values(publish));
             await refresh();
