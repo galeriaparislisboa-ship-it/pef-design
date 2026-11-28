@@ -21,8 +21,10 @@
 .pef-partner-selection {list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(85px,1fr));gap:10px}
 .pef-partner-selection li {min-width:0;padding:6px;background:#f5f5f7;border:1px solid #dedee3;border-radius:9px}
 .pef-partner-selection img {display:block;width:100%;aspect-ratio:1;object-fit:contain}
-.pef-partner-selection li div {display:flex;gap:4px;justify-content:flex-end}
-#pefCloudflareProfile .pef-partner-selection li button {min-width:32px;min-height:32px;padding:0 6px;background:#fff;border:1px solid #d8d8dc}
+.pef-partner-photo-grip {touch-action:none;user-select:none;cursor:grab;aspect-ratio:1}
+.pef-partner-photo-dragging {outline:2px solid #277ab1}
+.pef-partner-selection .pef-partner-photo-actions {display:flex;flex-wrap:wrap;gap:4px}
+#pefCloudflareProfile .pef-partner-selection li button {min-width:36px;min-height:44px;padding:0 6px;background:#fff;border:1px solid #d8d8dc}
 .pef-partner-identity {display:flex;align-items:center;gap:14px;margin:14px 0}
 .pef-partner-identity :is(h2,p) {margin:0}
 .pef-partner-identity img {width:64px;height:64px;object-fit:contain;border-radius:10px;background:#fff}

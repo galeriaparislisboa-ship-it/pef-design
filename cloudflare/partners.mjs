@@ -77,7 +77,7 @@ async function findPreview(db, token) {
 }
 
 async function pageListings(db, id) {
-  return (await rows(db, `SELECT o.id,o.title,o.description,o.price,o.category,o.city,o.country,o.whatsapp,o.photos,o.is_hidden,
+  return (await rows(db, `SELECT o.id,o.title,o.description,o.price,o.category,o.city,o.country,o.whatsapp,o.photos,o.video_url,o.is_hidden,
     l.source_url,l.published_at FROM pef_objects o JOIN pef_partner_listings l ON l.id=o.id
     WHERE l.page_id=? ORDER BY o.created_at DESC,o.id`, id)).map(row=>({...row,photos:JSON.parse(row.photos)}));
 }
