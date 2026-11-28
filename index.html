@@ -2531,6 +2531,22 @@ let pefRemoteRefreshBusy=false;
 let pefRemoteLoaded=0,pefRemoteHasMore=true;const PEF_FEED_PAGE_SIZE=12;let pefFeedPagingBusy=false;
 function pefCheckInfiniteFeed(){const feed=document.getElementById('feed');if(!feed||feed.classList.contains('hidden')||!pefRemoteHasMore||pefFeedPagingBusy||pefRemoteRefreshBusy)return;if(feed.scrollHeight-feed.scrollTop-feed.clientHeight<feed.clientHeight*3){pefFeedPagingBusy=true;loadRemote(true).finally(()=>{pefFeedPagingBusy=false})}}
 document.getElementById('feed')?.addEventListener('scroll',pefCheckInfiniteFeed,{passive:true});
+// Refresh the upcoming discovery slot while keeping visible cards mounted.
+function pefRotateUpcoming(feed,random=Math.random){
+ if(!feed.clientHeight||feed.classList.contains('hidden')||document.hidden)return;
+ const bottom=feed.getBoundingClientRect().bottom;
+ const upcoming=Array.from(feed.children).filter(card=>card.getBoundingClientRect().top>=bottom);
+ if(upcoming.length<2)return;
+ const pick=1+Math.floor(random()*(upcoming.length-1));
+ feed.insertBefore(upcoming[pick],upcoming[0]);
+}
+{
+ const feed=document.getElementById('feed');
+ let lastScroll=0;
+ feed.addEventListener('scroll',()=>{lastScroll=performance.now()},{passive:true});
+ setInterval(()=>{if(performance.now()-lastScroll>500)pefRotateUpcoming(feed)},8000);
+}
+
 
 // Circular feed: after the last visible listing, an additional upward swipe
 // returns to the first listing even when fewer than 60 items are published.
